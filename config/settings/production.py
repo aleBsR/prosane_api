@@ -1,14 +1,47 @@
-from .base import *
 import os
+from .base import *
+from pathlib import Path
+from dotenv import load_dotenv
 
-# SECURITY WARNING: don't run with debug turned on in production!
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Cargar variables de entorno. Se puede configurar una ruta absoluta
+# en producción definiendo PROSANE_ENV_PATH (ej: /opt/SIP_Servidor/SIP/.env)
+dotenv_path = os.getenv("PROSANE_ENV_PATH", os.path.join(BASE_DIR, '.env'))
+load_dotenv(dotenv_path=dotenv_path)
+
+# Seguridad
 DEBUG = False
+SECRET_KEY = os.getenv("SECRET_KEY")
 
-# Deberás configurar los hosts permitidos cuando sepas el dominio
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
+# Hosts permitidos desde .env
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 
-# Configuraciones para producción
-# Por ejemplo: Seguridad de cookies, HTTPS, almacenamiento de estáticos en S3, etc.
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+# Configuración de base de datos PostgreSQL de producción
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'),
+    }
+}
+
+# HTTPS y seguridad en producción
 SECURE_SSL_REDIRECT = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+
+# Archivos estáticos
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Archivos multimedia
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Zona horaria
+TIME_ZONE = 'America/Argentina/Buenos_Aires'
+USE_TZ = False
