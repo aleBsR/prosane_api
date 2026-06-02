@@ -1,6 +1,7 @@
 from django.db import models
 
 
+#DOMICILLIO
 class Domicilio(models.Model):
     calle = models.CharField(max_length=100, blank=True, null=True)
     nro_calle = models.CharField(max_length=10, blank=True, null=True)
@@ -15,10 +16,11 @@ class Domicilio(models.Model):
     localidad = models.CharField(max_length=20, blank=True, null=True)
 
     class Meta:
-        managed = False
-        db_table = 'domicilio'
+        managed = False # NO permite utilizar el ORM de Django para crear, modificar o eliminar esta tabla en la base de datos
+        db_table = 'domicilio' #Referencia el nombre de la tabla en la base de datos a la que se corresponde este modelo
 
 
+#PERSONAS
 class Personas(models.Model):
     nombre = models.CharField(max_length=256, blank=True, null=True)
     apellido = models.CharField(max_length=256, blank=True, null=True)
