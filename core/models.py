@@ -16,8 +16,8 @@ class Domicilio(models.Model):
     localidad = models.CharField(max_length=20, blank=True, null=True)
 
     class Meta:
-        managed = False # NO permite utilizar el ORM de Django para crear, modificar o eliminar esta tabla en la base de datos
-        db_table = 'domicilio' #Referencia el nombre de la tabla en la base de datos a la que se corresponde este modelo
+        managed = False
+        db_table = 'domicilio'
 
 
 #PERSONAS
@@ -30,3 +30,4 @@ class Personas(models.Model):
     class Meta:
         managed = False
         db_table = 'personas'
+
