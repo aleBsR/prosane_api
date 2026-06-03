@@ -63,8 +63,9 @@ class UserRole(models.Model):
     id = models.AutoField(primary_key=True)
     id_rol = models.ForeignKey(Roles, models.DO_NOTHING, db_column='id_rol')
     id_user = models.ForeignKey(Usuarios, models.DO_NOTHING, db_column='id_user')
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    # se crea la fecha automaticamente
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False

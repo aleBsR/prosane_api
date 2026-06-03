@@ -5,7 +5,7 @@ from rest_framework import status
 
 from rest_framework.decorators import api_view
 
-from authentication.models import UserManager, Usuarios
+from authentication.models import Roles, UserManager, UserRole, Usuarios
 from authentication.serializers import UserSerializer
 
 
@@ -41,6 +41,7 @@ def register(request):
         return Response({'error': 'Invalid data provided for persona'}, status=status.HTTP_400_BAD_REQUEST)
     
 
+
     #guardamos la persona en la db 
     persona.save()
 
@@ -48,9 +49,17 @@ def register(request):
 
     if usuario.is_valid():
         usuario.save()
+        UserRole.objects.create(
+            id_user=usuario.instance,
+            id_rol=Roles.objects.get(rol='usuario')  # Asigna el rol 'user' por defecto al nuevo usuario    
+        )
         return Response(
             {'message': 'User created successfully', 'user': usuario.data},
             status=status.HTTP_201_CREATED
         )
     return Response(usuario.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['POST'])
+def login(request):
+    #AQUI VA EL LOGIN CON JWT, POR AHORA SOLO DEVUELVE UN MENSAJE DE PRUEBA
+    return Response({'message': 'Login endpoint'}, status=status.HTTP_200_OK)
