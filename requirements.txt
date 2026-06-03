@@ -2,3 +2,4 @@ Django==6.0.5
 djangorestframework==3.17.1
 python-dotenv==1.2.2
 psycopg2-binary==2.9.12
+djangorestframework-simplejwt

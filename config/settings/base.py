@@ -14,6 +14,8 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -36,6 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework_simplejwt',
     'core',
     'authentication',
     'patients',
@@ -122,3 +126,45 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+
+# Configuración de Django REST Framework y JWT
+
+from datetime import timedelta
+
+
+REST_FRAMEWORK = {
+
+    # Esto asegura que JWTAuthentication se utilice como el método de autenticación 
+    # por defecto para todas las vistas de la API.
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+
+    # Esto asegura que todas las vistas de la API requieran autenticación por defecto,
+    #  a menos que se especifique lo contrario en la vista individual.
+    'DEFAULT_PERMISSION_CLASSES':(
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
+
+# Configuración de Simple JWT
+SIMPLE_JWT = {
+
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+
+    'ROTATE_REFRESH_TOKENS': True,
+
+    'BLACKLIST_AFTER_ROTATION': False,
+
+    'UPDATE_LAST_LOGIN': True,
+
+    'ALGORITHM': 'HS256',
+
+    'SIGNING_KEY': SECRET_KEY,
+
+    'AUTH_HEADER_TYPES': ('Bearer',),
+
+}

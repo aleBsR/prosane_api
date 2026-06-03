@@ -1,20 +1,36 @@
 from django.http import JsonResponse
 from django.shortcuts import render
+
+from django.contrib.auth import authenticate
+
 from rest_framework.response import Response
 from rest_framework import status
 
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes , permission_classes
+from rest_framework.permissions import AllowAny
 
 from authentication.models import Roles, UserManager, UserRole, Usuarios
-from authentication.serializers import UserSerializer
+from authentication.serializers import RolesSerializer, UserSerializer
 
 
 from core.models import Personas
 from core.serializers import PersonasSerializer
 
+from rest_framework_simplejwt.tokens import RefreshToken
+
 # Create your views here.
 
+
+def getCustomToken(user):
+    token = RefreshToken.for_user(user)
+    roles = Roles.objects.filter(userrole__id_user=user)
+    roles_serializer = RolesSerializer(roles, many=True)
+    token['roles'] = roles_serializer.data
+    return token
+
 @api_view(['POST'])
+@permission_classes([AllowAny]) #Esto permite que cualquier usuario,
+#incluso aquellos que no están autenticados puedan acceder a esta vista para registrarse. 
 def register(request):
     #primero crear la persona, luego el usuario y asociarlo a la persona creada
     nombre = request.data.get('nombre')
@@ -41,7 +57,6 @@ def register(request):
         return Response({'error': 'Invalid data provided for persona'}, status=status.HTTP_400_BAD_REQUEST)
     
 
-
     #guardamos la persona en la db 
     persona.save()
 
@@ -59,7 +74,24 @@ def register(request):
         )
     return Response(usuario.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def login(request):
-    #AQUI VA EL LOGIN CON JWT, POR AHORA SOLO DEVUELVE UN MENSAJE DE PRUEBA
-    return Response({'message': 'Login endpoint'}, status=status.HTTP_200_OK)
+    
+    email = request.data.get('email')
+    password = request.data.get('password')
+
+    if not all ([email, password]):
+        return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    #django valida
+    user = authenticate(request, username=email, password=password)
+
+    if user is not None:
+        token = getCustomToken(user)
+        print(token.payload)
+        access_token = str(token.access_token)
+        return Response({'token': access_token}, status=status.HTTP_200_OK)
+    else:
+        return Response({'error': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
