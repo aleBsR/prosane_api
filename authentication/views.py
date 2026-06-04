@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 
 from django.contrib.auth import authenticate
 
@@ -18,14 +18,16 @@ from core.serializers import PersonasSerializer
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from .permissions import EsMedico
+
 # Create your views here.
 
 
 def getCustomToken(user):
     token = RefreshToken.for_user(user)
-    roles = Roles.objects.filter(userrole__id_user=user)
+    roles = user.roles.all() # obtenemos los roles del usuario a través de la relación ManyToMany definida en el modelo Usuarios.
     roles_serializer = RolesSerializer(roles, many=True)
-    token['roles'] = roles_serializer.data
+    token['roles'] = roles_serializer.data #guardamos los roles
     return token
 
 @api_view(['POST'])
@@ -57,14 +59,15 @@ def register(request):
         return Response({'error': 'Invalid data provided for persona'}, status=status.HTTP_400_BAD_REQUEST)
     
 
+
     #guardamos la persona en la db 
     persona.save()
 
     usuario = UserSerializer(data={'email': email, 'password': password, 'persona': persona.instance.id})
 
     if usuario.is_valid():
-        usuario.save()
-        UserRole.objects.create(
+        usuario.save() # se guarda en la db
+        UserRole.objects.create( # creamos la fila en la db para asociar el usuario con su rol
             id_user=usuario.instance,
             id_rol=Roles.objects.get(rol='usuario')  # Asigna el rol 'user' por defecto al nuevo usuario    
         )
@@ -78,7 +81,7 @@ def register(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login(request):
-    
+ 
     email = request.data.get('email')
     password = request.data.get('password')
 
@@ -95,3 +98,33 @@ def login(request):
         return Response({'token': access_token}, status=status.HTTP_200_OK)
     else:
         return Response({'error': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
+    
+
+#falta permitir que solo el admin agregue
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def asignar_rol(request, id):
+
+    #obtener usuario y rol
+    userid = get_object_or_404(Usuarios,pk=id)
+    rol = get_object_or_404(Roles, rol=request.data.get('rol'))
+
+    #validar si el usuario ya tiene ese rol
+    #Si no, lo crea
+    user,created = UserRole.objects.get_or_create(
+        id_user = userid,
+        id_rol = rol
+    )
+
+    if created:
+        return Response({'message':'Rol asigned correctly'},status=status.HTTP_201_CREATED)
+    else:
+        return Response({'message': 'Already with the role'}, status=status.HTTP_409_CONFLICT)
+    
+@api_view(['GET'])
+@permission_classes([EsMedico])
+def solo_medicos(request):
+    return Response({'message':'YOU ARE ALLOWED'},status=status.HTTP_202_ACCEPTED)
+
+
+

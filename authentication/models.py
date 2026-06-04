@@ -52,11 +52,19 @@ class Usuarios(AbstractBaseUser,PermissionsMixin):
 
     USERNAME_FIELD = 'email' #Indica que el campo email se utilizará como el identificador único para autenticar a los usuarios en lugar del campo username predeterminado. Esto significa que los usuarios iniciarán sesión utilizando su dirección de correo electrónico en lugar de un nombre de usuario tradicional.
 
+    #objects es el administrador personalizado que se utilizará para crear usuarios y superusuarios
     objects = UserManager()
 
+    roles = models.ManyToManyField(
+            Roles,
+            through='UserRole',
+            through_fields=('id_user', 'id_rol'),
+            related_name='usuarios' #nombre inverso
+                                   )
+
     class Meta:
-        managed = True
-        db_table = 'usuarios'
+        managed = False 
+        db_table = 'usuarios' #Especifica el nombre en la db
 
 
 class UserRole(models.Model):
