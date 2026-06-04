@@ -1,8 +1,5 @@
-
-
-from authentication import serializers
-from .models import Personas
-
+from rest_framework import serializers
+from .models import Personas, Domicilio
 
 
 class PersonasSerializer(serializers.ModelSerializer):
@@ -14,3 +11,8 @@ class PersonasSerializer(serializers.ModelSerializer):
             'dni': {'required': True},
             'tipo_dni': {'required': True}
         }
+
+class DomicilioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Domicilio
+        fields = '__all__'
