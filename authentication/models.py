@@ -1,5 +1,6 @@
+import uuid
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, AbstractUser, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, AbstractUser, BaseUserManager, PermissionsMixin
 
 
 class Roles(models.Model):
@@ -11,7 +12,7 @@ class Roles(models.Model):
         db_table = 'roles'
 
 
-class UserManager(models.Manager):
+class UserManager(BaseUserManager):
 
     #**extra_fields es un diccionario que permite pasar campos adicionales al crear un usuario. 
     #Esto es útil para agregar campos personalizados al modelo de usuario sin tener que modificar la firma del método create_user.
@@ -33,12 +34,12 @@ class UserManager(models.Manager):
         
 
 class Usuarios(AbstractBaseUser,PermissionsMixin):
-    id = models.UUIDField(primary_key=True) #UUIDField es un campo de modelo que almacena un identificador único universal (UUID) como clave primaria para el modelo Usuarios. Esto garantiza que cada usuario tenga un identificador único y no se repita, lo que es especialmente útil en aplicaciones distribuidas o cuando se requiere una mayor seguridad en la identificación de usuarios.
-    id_persona = models.ForeignKey(
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    persona = models.ForeignKey(
         'core.Personas', models.DO_NOTHING,
         db_column='id_persona', blank=True, null=True
     )
-    email = models.CharField(unique=True, max_length=256, blank=True, null=True)
+    email = models.EmailField(unique=True, max_length=256, blank=True, null=True)
     password = models.CharField(max_length=256, db_column='password_hash', blank=True, null=True)
 
     is_active = models.BooleanField(default=True) #Indica si el usuario está activo o no. 
@@ -50,17 +51,29 @@ class Usuarios(AbstractBaseUser,PermissionsMixin):
 
 
     USERNAME_FIELD = 'email' #Indica que el campo email se utilizará como el identificador único para autenticar a los usuarios en lugar del campo username predeterminado. Esto significa que los usuarios iniciarán sesión utilizando su dirección de correo electrónico en lugar de un nombre de usuario tradicional.
+
+    #objects es el administrador personalizado que se utilizará para crear usuarios y superusuarios
+    objects = UserManager()
+
+    roles = models.ManyToManyField(
+            Roles,
+            through='UserRole',
+            through_fields=('id_user', 'id_rol'),
+            related_name='usuarios' #nombre inverso
+                                   )
+
     class Meta:
-        managed = True
-        db_table = 'usuarios'
+        managed = False 
+        db_table = 'usuarios' #Especifica el nombre en la db
 
 
 class UserRole(models.Model):
     id = models.AutoField(primary_key=True)
     id_rol = models.ForeignKey(Roles, models.DO_NOTHING, db_column='id_rol')
     id_user = models.ForeignKey(Usuarios, models.DO_NOTHING, db_column='id_user')
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    # se crea la fecha automaticamente
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False

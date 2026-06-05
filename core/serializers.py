@@ -7,6 +7,8 @@ class PersonasSerializer(serializers.ModelSerializer):
         model = Personas
         fields = '__all__'
 
+        # No se muestra en la salida pero es necesario para 
+        # validar que se proporcionen estos campos al crear una persona.
         extra_kwargs = {
             'dni': {'required': True},
             'tipo_dni': {'required': True}
