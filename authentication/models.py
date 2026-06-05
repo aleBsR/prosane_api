@@ -39,7 +39,7 @@ class Usuarios(AbstractBaseUser,PermissionsMixin):
         'core.Personas', models.DO_NOTHING,
         db_column='id_persona', blank=True, null=True
     )
-    email = models.CharField(unique=True, max_length=256, blank=True, null=True)
+    email = models.EmailField(unique=True, max_length=256, blank=True, null=True)
     password = models.CharField(max_length=256, db_column='password_hash', blank=True, null=True)
 
     is_active = models.BooleanField(default=True) #Indica si el usuario está activo o no. 
