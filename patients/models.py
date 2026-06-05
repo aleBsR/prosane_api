@@ -3,7 +3,7 @@ from django.db import models
 
 class Responsables(models.Model):
     parentesco = models.CharField(max_length=50)
-    id_persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
+    persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
 
     class Meta:
         managed = False
@@ -11,9 +11,9 @@ class Responsables(models.Model):
 
 
 class Pacientes(models.Model):
-    id_domicilio = models.ForeignKey('core.Domicilio', models.DO_NOTHING, db_column='id_domicilio')
-    id_responsable = models.ForeignKey(Responsables, models.DO_NOTHING, db_column='id_responsable')
-    id_persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
+    domicilio = models.ForeignKey('core.Domicilio', models.DO_NOTHING, db_column='id_domicilio')
+    responsable = models.ForeignKey(Responsables, models.DO_NOTHING, db_column='id_responsable')
+    persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
     edad = models.IntegerField()
     tiene_cud = models.CharField(max_length=2, blank=True, null=True)
     tipo_cobertura = models.CharField(max_length=20, blank=True, null=True)
@@ -25,7 +25,7 @@ class Pacientes(models.Model):
 
 
 class Antecedentesfamiliares(models.Model):
-    id_paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
+    paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
     problemas_salud = models.CharField(max_length=10, blank=True, null=True)
     detalle_problema_salud = models.CharField(max_length=255, blank=True, null=True)
     familiar_con_muerte_subita = models.CharField(max_length=10, blank=True, null=True)
@@ -36,8 +36,8 @@ class Antecedentesfamiliares(models.Model):
 
 
 class Antecedentespersonales(models.Model):
-    id_antecedente = models.AutoField(primary_key=True)
-    id_paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
+    antecedente = models.AutoField(primary_key=True)
+    paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
     nacio_prematuro = models.CharField(max_length=10)
     peso_nacimiento = models.CharField(max_length=10)
     convulsiones_epilepsia = models.CharField(max_length=10)
