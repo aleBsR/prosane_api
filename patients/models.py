@@ -14,8 +14,6 @@ class Pacientes(models.Model):
     id_domicilio = models.ForeignKey('core.Domicilio', models.DO_NOTHING, db_column='id_domicilio')
     id_responsable = models.ForeignKey(Responsables, models.DO_NOTHING, db_column='id_responsable')
     id_persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
-    sexo = models.CharField(max_length=10)
-    fecha_nacimiento = models.DateField()
     edad = models.IntegerField()
     tiene_cud = models.CharField(max_length=2, blank=True, null=True)
     tipo_cobertura = models.CharField(max_length=20, blank=True, null=True)
