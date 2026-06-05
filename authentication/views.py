@@ -39,7 +39,7 @@ def register(request):
         usuario.save()
         return Response({'message': 'User created succesfully.', 'data':usuario.data}, status=status.HTTP_201_CREATED)
     else:
-        return Response({'message':'Something went wrong...'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': usuario.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])
@@ -66,10 +66,5 @@ def asignar_rol(request, id):
        return Response({'error': user_rol.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     
-@api_view(['GET'])
-@permission_classes([EsMedico])
-def solo_medicos(request):
-    return Response({'message':'YOU ARE ALLOWED'},status=status.HTTP_202_ACCEPTED)
-
 
 
