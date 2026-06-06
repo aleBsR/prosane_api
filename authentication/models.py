@@ -39,7 +39,7 @@ class Usuarios(AbstractBaseUser,PermissionsMixin):
         'core.Personas', models.DO_NOTHING,
         db_column='id_persona', blank=True, null=True
     )
-    email = models.CharField(unique=True, max_length=256, blank=True, null=True)
+    email = models.EmailField(unique=True, max_length=256, blank=True, null=True)
     password = models.CharField(max_length=256, db_column='password_hash', blank=True, null=True)
 
     is_active = models.BooleanField(default=True) #Indica si el usuario está activo o no. 
@@ -52,19 +52,28 @@ class Usuarios(AbstractBaseUser,PermissionsMixin):
 
     USERNAME_FIELD = 'email' #Indica que el campo email se utilizará como el identificador único para autenticar a los usuarios en lugar del campo username predeterminado. Esto significa que los usuarios iniciarán sesión utilizando su dirección de correo electrónico en lugar de un nombre de usuario tradicional.
 
+    #objects es el administrador personalizado que se utilizará para crear usuarios y superusuarios
     objects = UserManager()
 
+    roles = models.ManyToManyField(
+            Roles,
+            through='UserRole',
+            through_fields=('id_user', 'id_rol'),
+            related_name='usuarios' #nombre inverso
+                                   )
+
     class Meta:
-        managed = True
-        db_table = 'usuarios'
+        managed = False 
+        db_table = 'usuarios' #Especifica el nombre en la db
 
 
 class UserRole(models.Model):
     id = models.AutoField(primary_key=True)
     id_rol = models.ForeignKey(Roles, models.DO_NOTHING, db_column='id_rol')
     id_user = models.ForeignKey(Usuarios, models.DO_NOTHING, db_column='id_user')
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
+    # se crea la fecha automaticamente
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False
