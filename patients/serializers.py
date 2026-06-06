@@ -5,7 +5,8 @@ from core.serializers import PersonasSerializer, DomicilioSerializer
 from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales
 
 class ResponsablesSerializer(serializers.ModelSerializer):
-    persona = PersonasSerializer(source='id_persona')
+    # La ForeignKey en el modelo Responsables ahora se llama 'persona'
+    persona = PersonasSerializer()
 
     class Meta:
         model = Responsables
@@ -13,16 +14,16 @@ class ResponsablesSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        persona_data = validated_data.pop('id_persona')
+        persona_data = validated_data.pop('persona')
         persona = Personas.objects.create(**persona_data)
-        responsable = Responsables.objects.create(id_persona=persona, **validated_data)
+        responsable = Responsables.objects.create(persona=persona, **validated_data)
         return responsable
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        persona_data = validated_data.pop('id_persona', None)
+        persona_data = validated_data.pop('persona', None)
         if persona_data:
-            persona = instance.id_persona
+            persona = instance.persona
             for attr, value in persona_data.items():
                 setattr(persona, attr, value)
             persona.save()
@@ -33,22 +34,21 @@ class ResponsablesSerializer(serializers.ModelSerializer):
 
 
 class PacientesSerializer(serializers.ModelSerializer):
-    # Usamos 'source' para renombrar las claves en el JSON de salida a nombres más limpios
-    persona = PersonasSerializer(source='id_persona')
-    domicilio = DomicilioSerializer(source='id_domicilio')
+    # Las ForeignKeys en Pacientes ahora se llaman 'persona', 'domicilio', 'responsable'
+    persona = PersonasSerializer()
+    domicilio = DomicilioSerializer()
 
     class Meta:
         model = Pacientes
         fields = [
-            'id', 'persona', 'domicilio', 'id_responsable',
-            'sexo', 'fecha_nacimiento', 'edad', 'tiene_cud',
-            'tipo_cobertura', 'nombre_cobertura'
+            'id', 'persona', 'domicilio', 'responsable',
+            'edad', 'tiene_cud', 'tipo_cobertura', 'nombre_cobertura'
         ]
 
     @transaction.atomic
     def create(self, validated_data):
-        persona_data = validated_data.pop('id_persona')
-        domicilio_data = validated_data.pop('id_domicilio')
+        persona_data = validated_data.pop('persona')
+        domicilio_data = validated_data.pop('domicilio')
 
         # 1. Crear Persona
         persona = Personas.objects.create(**persona_data)
@@ -58,27 +58,27 @@ class PacientesSerializer(serializers.ModelSerializer):
 
         # 3. Crear Paciente
         paciente = Pacientes.objects.create(
-            id_persona=persona,
-            id_domicilio=domicilio,
+            persona=persona,
+            domicilio=domicilio,
             **validated_data
         )
         return paciente
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        persona_data = validated_data.pop('id_persona', None)
-        domicilio_data = validated_data.pop('id_domicilio', None)
+        persona_data = validated_data.pop('persona', None)
+        domicilio_data = validated_data.pop('domicilio', None)
 
         # 1. Actualizar Persona
         if persona_data:
-            persona = instance.id_persona
+            persona = instance.persona
             for attr, value in persona_data.items():
                 setattr(persona, attr, value)
             persona.save()
 
         # 2. Actualizar Domicilio
         if domicilio_data:
-            domicilio = instance.id_domicilio
+            domicilio = instance.domicilio
             for attr, value in domicilio_data.items():
                 setattr(domicilio, attr, value)
             domicilio.save()
@@ -93,12 +93,12 @@ class PacientesSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         # Personalizamos la salida para que sea más amigable para el frontend
         rep = super().to_representation(instance)
-        if instance.id_responsable:
+        if instance.responsable:
             rep['responsable_detalle'] = {
-                'id': instance.id_responsable.id,
-                'parentesco': instance.id_responsable.parentesco,
-                'nombre': instance.id_responsable.id_persona.nombre if instance.id_responsable.id_persona else "",
-                'apellido': instance.id_responsable.id_persona.apellido if instance.id_responsable.id_persona else ""
+                'id': instance.responsable.id,
+                'parentesco': instance.responsable.parentesco,
+                'nombre': instance.responsable.persona.nombre if instance.responsable.persona else "",
+                'apellido': instance.responsable.persona.apellido if instance.responsable.persona else ""
             }
         return rep
 
