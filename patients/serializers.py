@@ -5,28 +5,32 @@ from core.serializers import PersonasSerializer, DomicilioSerializer
 from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales
 
 class ResponsablesSerializer(serializers.ModelSerializer):
-    persona = PersonasSerializer(source='id_persona')
 
+    #Persona ya no tiene FK en Responsable
+    # Porque Responsable sera un usuario (tendra su parte visual...)
     class Meta:
         model = Responsables
-        fields = ['id', 'persona', 'parentesco']
+        fields = ['id', 'usuario', 'parentesco']
 
-    @transaction.atomic
+    #@transaction.atomic
     def create(self, validated_data):
-        persona_data = validated_data.pop('id_persona')
-        persona = Personas.objects.create(**persona_data)
-        responsable = Responsables.objects.create(id_persona=persona, **validated_data)
+        #el usuario viene en validated_data
+        responsable = Responsables.objects.create(**validated_data)
         return responsable
+
+        #persona_data = validated_data.pop('id_persona')
+        #persona = Personas.objects.create(**persona_data)
+        #responsable = Responsables.objects.create(id_persona=persona, **validated_data)
+        #return responsable
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        persona_data = validated_data.pop('id_persona', None)
-        if persona_data:
-            persona = instance.id_persona
-            for attr, value in persona_data.items():
-                setattr(persona, attr, value)
-            persona.save()
-        
+       # persona_data = validated_data.pop('id_persona', None)
+        #if persona_data:
+         #   persona = instance.id_persona
+          #  for attr, value in persona_data.items():
+           #     setattr(persona, attr, value)
+            #persona.save()
         instance.parentesco = validated_data.get('parentesco', instance.parentesco)
         instance.save()
         return instance
@@ -91,14 +95,14 @@ class PacientesSerializer(serializers.ModelSerializer):
         return instance
 
     def to_representation(self, instance):
-        # Personalizamos la salida para que sea más amigable para el frontend
         rep = super().to_representation(instance)
-        if instance.id_responsable:
+        if instance.id_responsable and instance.id_responsable.persona:
+            persona = instance.id_responsable.persona
             rep['responsable_detalle'] = {
                 'id': instance.id_responsable.id,
                 'parentesco': instance.id_responsable.parentesco,
-                'nombre': instance.id_responsable.id_persona.nombre if instance.id_responsable.id_persona else "",
-                'apellido': instance.id_responsable.id_persona.apellido if instance.id_responsable.id_persona else ""
+                'nombre': persona.nombre or '',
+                'apellido': persona.apellido or ''
             }
         return rep
 

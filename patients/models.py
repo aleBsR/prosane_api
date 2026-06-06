@@ -3,7 +3,8 @@ from django.db import models
 
 class Responsables(models.Model):
     parentesco = models.CharField(max_length=50)
-    id_persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
+    persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona', null=True, blank=True)
+    usuario = models.ForeignKey('authentication.Usuarios', models.DO_NOTHING, db_column='usuario', null=True, blank=True)
 
     class Meta:
         managed = False
@@ -11,9 +12,9 @@ class Responsables(models.Model):
 
 
 class Pacientes(models.Model):
-    id_domicilio = models.ForeignKey('core.Domicilio', models.DO_NOTHING, db_column='id_domicilio')
-    id_responsable = models.ForeignKey(Responsables, models.DO_NOTHING, db_column='id_responsable')
-    id_persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
+    domicilio = models.ForeignKey('core.Domicilio', models.DO_NOTHING, db_column='id_domicilio')
+    responsable = models.ForeignKey(Responsables, models.DO_NOTHING, db_column='id_responsable', null=True)
+    persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
     edad = models.IntegerField()
     tiene_cud = models.CharField(max_length=2, blank=True, null=True)
     tipo_cobertura = models.CharField(max_length=20, blank=True, null=True)

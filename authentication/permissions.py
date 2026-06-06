@@ -28,6 +28,11 @@ class EsMedico(TieneRol):
 class EsOndontologo(TieneRol):
     nombre_rol = 'odontologo'
 
+class EsTutor(TieneRol):
+    nombre_rol = 'tutor'
+
+class EsAyudante(TieneRol):
+    nombre_rol = 'ayudante'
 
 class EsAdmin(IsAuthenticated):
     def has_permission(self, request, view):

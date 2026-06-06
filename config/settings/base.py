@@ -168,3 +168,7 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 
 }
+
+# MVP: validación de matrículas contra datos mockeados
+# Cambiar a False cuando se integre con REFEPS real
+REFEPS_MOCK = True
