@@ -37,22 +37,21 @@ class ResponsablesSerializer(serializers.ModelSerializer):
 
 
 class PacientesSerializer(serializers.ModelSerializer):
-    # Usamos 'source' para renombrar las claves en el JSON de salida a nombres más limpios
-    persona = PersonasSerializer(source='id_persona')
-    domicilio = DomicilioSerializer(source='id_domicilio')
+    # Las ForeignKeys en Pacientes ahora se llaman 'persona', 'domicilio', 'responsable'
+    persona = PersonasSerializer()
+    domicilio = DomicilioSerializer()
 
     class Meta:
         model = Pacientes
         fields = [
-            'id', 'persona', 'domicilio', 'id_responsable',
-            'sexo', 'fecha_nacimiento', 'edad', 'tiene_cud',
-            'tipo_cobertura', 'nombre_cobertura'
+            'id', 'persona', 'domicilio', 'responsable',
+            'edad', 'tiene_cud', 'tipo_cobertura', 'nombre_cobertura'
         ]
 
     @transaction.atomic
     def create(self, validated_data):
-        persona_data = validated_data.pop('id_persona')
-        domicilio_data = validated_data.pop('id_domicilio')
+        persona_data = validated_data.pop('persona')
+        domicilio_data = validated_data.pop('domicilio')
 
         # 1. Crear Persona
         persona = Personas.objects.create(**persona_data)
@@ -62,27 +61,27 @@ class PacientesSerializer(serializers.ModelSerializer):
 
         # 3. Crear Paciente
         paciente = Pacientes.objects.create(
-            id_persona=persona,
-            id_domicilio=domicilio,
+            persona=persona,
+            domicilio=domicilio,
             **validated_data
         )
         return paciente
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        persona_data = validated_data.pop('id_persona', None)
-        domicilio_data = validated_data.pop('id_domicilio', None)
+        persona_data = validated_data.pop('persona', None)
+        domicilio_data = validated_data.pop('domicilio', None)
 
         # 1. Actualizar Persona
         if persona_data:
-            persona = instance.id_persona
+            persona = instance.persona
             for attr, value in persona_data.items():
                 setattr(persona, attr, value)
             persona.save()
 
         # 2. Actualizar Domicilio
         if domicilio_data:
-            domicilio = instance.id_domicilio
+            domicilio = instance.domicilio
             for attr, value in domicilio_data.items():
                 setattr(domicilio, attr, value)
             domicilio.save()

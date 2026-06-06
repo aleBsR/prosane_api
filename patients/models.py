@@ -26,7 +26,7 @@ class Pacientes(models.Model):
 
 
 class Antecedentesfamiliares(models.Model):
-    id_paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
+    paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
     problemas_salud = models.CharField(max_length=10, blank=True, null=True)
     detalle_problema_salud = models.CharField(max_length=255, blank=True, null=True)
     familiar_con_muerte_subita = models.CharField(max_length=10, blank=True, null=True)
@@ -37,8 +37,8 @@ class Antecedentesfamiliares(models.Model):
 
 
 class Antecedentespersonales(models.Model):
-    id_antecedente = models.AutoField(primary_key=True)
-    id_paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
+    antecedente = models.AutoField(primary_key=True)
+    paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
     nacio_prematuro = models.CharField(max_length=10)
     peso_nacimiento = models.CharField(max_length=10)
     convulsiones_epilepsia = models.CharField(max_length=10)
