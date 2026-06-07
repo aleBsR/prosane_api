@@ -5,32 +5,16 @@ from core.serializers import PersonasSerializer, DomicilioSerializer
 from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales
 
 class ResponsablesSerializer(serializers.ModelSerializer):
-
-    #Persona ya no tiene FK en Responsable
-    # Porque Responsable sera un usuario (tendra su parte visual...)
     class Meta:
         model = Responsables
-        fields = ['id', 'usuario', 'parentesco']
+        fields = ['id', 'usuario', 'persona', 'parentesco']
 
-    #@transaction.atomic
     def create(self, validated_data):
-        #el usuario viene en validated_data
         responsable = Responsables.objects.create(**validated_data)
         return responsable
 
-        #persona_data = validated_data.pop('id_persona')
-        #persona = Personas.objects.create(**persona_data)
-        #responsable = Responsables.objects.create(id_persona=persona, **validated_data)
-        #return responsable
-
     @transaction.atomic
     def update(self, instance, validated_data):
-       # persona_data = validated_data.pop('id_persona', None)
-        #if persona_data:
-         #   persona = instance.id_persona
-          #  for attr, value in persona_data.items():
-           #     setattr(persona, attr, value)
-            #persona.save()
         instance.parentesco = validated_data.get('parentesco', instance.parentesco)
         instance.save()
         return instance
@@ -109,10 +93,10 @@ class PacientesSerializer(serializers.ModelSerializer):
 class AntecedentesfamiliaresSerializer(serializers.ModelSerializer):
     class Meta:
         model = Antecedentesfamiliares
-        fields = '__all__'
+        fields = ['problemas_salud', 'detalle_problema_salud', 'familiar_con_muerte_subita']
 
 
 class AntecedentespersonalesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Antecedentespersonales
-        fields = '__all__'
+        exclude = ['antecedente', 'paciente']
