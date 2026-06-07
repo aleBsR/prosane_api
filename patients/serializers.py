@@ -95,11 +95,11 @@ class PacientesSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        if instance.id_responsable and instance.id_responsable.persona:
-            persona = instance.id_responsable.persona
+        if instance.responsable and instance.responsable.persona:
+            persona = instance.responsable.persona
             rep['responsable_detalle'] = {
-                'id': instance.id_responsable.id,
-                'parentesco': instance.id_responsable.parentesco,
+                'id': instance.responsable.id,
+                'parentesco': instance.responsable.parentesco,
                 'nombre': persona.nombre or '',
                 'apellido': persona.apellido or ''
             }

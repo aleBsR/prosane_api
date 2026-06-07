@@ -265,9 +265,9 @@ from .serializers import PacientesSerializer
 @api_view(['POST'])
 @permission_classes([EsTutor])
 def crear_paciente(request):
-
     paciente = PacientesSerializer(data=request.data)
-
     if paciente.is_valid():
         paciente.save()
+        return Response(paciente.data, status=status.HTTP_201_CREATED)
+    return Response(paciente.errors, status=status.HTTP_400_BAD_REQUEST)
 

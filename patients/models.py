@@ -37,7 +37,7 @@ class Antecedentesfamiliares(models.Model):
 
 
 class Antecedentespersonales(models.Model):
-    antecedente = models.AutoField(primary_key=True)
+    antecedente = models.AutoField(primary_key=True, db_column='id_antecedente')
     paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
     nacio_prematuro = models.CharField(max_length=10)
     peso_nacimiento = models.CharField(max_length=10)
