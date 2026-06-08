@@ -3,6 +3,7 @@ from rest_framework import serializers
 from rest_framework.test import APIRequestFactory
 
 from common.mixins import AuditViewMixin
+from common.serializers import AuditSerializerMixin
 from common.tests.base import AuditModelTestCase
 
 User = get_user_model()
@@ -58,3 +59,71 @@ class AuditViewMixinTests(AuditModelTestCase):
         obj.refresh_from_db()
         self.assertEqual(obj.created_by, creator)
         self.assertEqual(obj.updated_by, editor)
+
+
+class AuditSerializerMixinTests(AuditModelTestCase):
+    def _serializer_class(self):
+        _model = self.AuditExample
+
+        class _Ser(AuditSerializerMixin, serializers.ModelSerializer):
+            class Meta:
+                model = _model
+                fields = ["id", "name", "created_by", "updated_by"]
+                read_only_fields = AuditSerializerMixin.AUDIT_READ_ONLY_FIELDS
+
+        return _Ser
+
+    def _request(self, user):
+        req = APIRequestFactory().post("/")
+        req.user = user
+        return req
+
+    def test_create_stamps_actor(self):
+        user = User.objects.create_user(email="sc@sc.com", password="x")
+        ser = self._serializer_class()(
+            data={"name": "a"}, context={"request": self._request(user)}
+        )
+        ser.is_valid(raise_exception=True)
+        obj = ser.save()
+        self.assertEqual(obj.created_by, user)
+        self.assertEqual(obj.updated_by, user)
+
+    def test_update_stamps_updated_by(self):
+        creator = User.objects.create_user(email="sc2@sc.com", password="x")
+        editor = User.objects.create_user(email="se@se.com", password="x")
+        obj = self.AuditExample.objects.create(
+            name="a", created_by=creator, updated_by=creator
+        )
+        ser = self._serializer_class()(
+            instance=obj,
+            data={"name": "b"},
+            partial=True,
+            context={"request": self._request(editor)},
+        )
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        obj.refresh_from_db()
+        self.assertEqual(obj.created_by, creator)
+        self.assertEqual(obj.updated_by, editor)
+
+    def test_create_without_context_does_not_crash(self):
+        ser = self._serializer_class()(data={"name": "b"})
+        ser.is_valid(raise_exception=True)
+        obj = ser.save()
+        self.assertIsNone(obj.created_by)
+        self.assertIsNone(obj.updated_by)
+
+    def test_create_with_anonymous_user_does_not_stamp(self):
+        from unittest.mock import Mock
+
+        anon = Mock()
+        anon.is_authenticated = False
+        req = APIRequestFactory().post("/")
+        req.user = anon
+        ser = self._serializer_class()(
+            data={"name": "c"}, context={"request": req}
+        )
+        ser.is_valid(raise_exception=True)
+        obj = ser.save()
+        self.assertIsNone(obj.created_by)
+        self.assertIsNone(obj.updated_by)

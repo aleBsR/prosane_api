@@ -1,5 +1,5 @@
 class AuditSerializerMixin:
-    """Sella el actor desde el request en serializers que no usan AuditViewMixin.
+    """Sella el actor desde el request, para serializers usados fuera de una vista con AuditViewMixin (ambos componen de forma segura gracias a setdefault).
 
     Los serializers concretos deberían marcar los campos de auditoría como
     read-only, por ejemplo en Meta:
