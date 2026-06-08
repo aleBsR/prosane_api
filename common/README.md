@@ -41,6 +41,11 @@ Los registros no se borran: se marcan con `deleted_at`.
 El borrado masivo por cualquiera de los dos managers es **soft**; el borrado
 real es siempre explícito vía `hard_delete()`.
 
+> Heads-up: como `objects` (que oculta los borrados) es el manager por defecto,
+> `refresh_from_db()` sobre un registro borrado y la navegación por FK hacia una
+> fila borrada lanzan `DoesNotExist`. Es el tradeoff esperado del soft delete
+> (oculta de más, nunca de menos); usá `all_objects` si necesitás el registro.
+
 > Nota: `delete()` de instancia devuelve `None` (no la tupla
 > `(count, {label: count})` de Django).
 

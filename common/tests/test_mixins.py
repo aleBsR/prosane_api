@@ -127,3 +127,28 @@ class AuditSerializerMixinTests(AuditModelTestCase):
         obj = ser.save()
         self.assertIsNone(obj.created_by)
         self.assertIsNone(obj.updated_by)
+
+    def test_create_overrides_client_supplied_actor(self):
+        actor = User.objects.create_user(email="real@r.com", password="x")
+        spoof_target = User.objects.create_user(email="spoof@s.com", password="x")
+        _model = self.AuditExample
+
+        # Serializer que EXPONE created_by/updated_by como escribibles a propósito,
+        # para verificar que el mixin igual impone el actor del request.
+        class _WritableSer(AuditSerializerMixin, serializers.ModelSerializer):
+            class Meta:
+                model = _model
+                fields = ["id", "name", "created_by", "updated_by"]
+
+        ser = _WritableSer(
+            data={
+                "name": "a",
+                "created_by": str(spoof_target.pk),
+                "updated_by": str(spoof_target.pk),
+            },
+            context={"request": self._request(actor)},
+        )
+        ser.is_valid(raise_exception=True)
+        obj = ser.save()
+        self.assertEqual(obj.created_by, actor)
+        self.assertEqual(obj.updated_by, actor)

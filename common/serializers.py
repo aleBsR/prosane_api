@@ -22,8 +22,11 @@ class AuditSerializerMixin:
     def create(self, validated_data):
         actor = self._actor()
         if actor is not None and getattr(actor, "is_authenticated", False):
-            validated_data.setdefault("created_by", actor)
-            validated_data.setdefault("updated_by", actor)
+            # Sobrescribimos (no setdefault): el actor del request manda. Así la
+            # auditoría es a prueba de spoofing aunque un serializer concreto
+            # olvide marcar created_by/updated_by como read-only.
+            validated_data["created_by"] = actor
+            validated_data["updated_by"] = actor
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
