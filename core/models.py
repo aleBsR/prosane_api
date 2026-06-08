@@ -1,8 +1,8 @@
 from django.db import models
+from common.models import BaseModel
 
 
-#DOMICILLIO
-class Domicilio(models.Model):
+class Domicilio(BaseModel):
     calle = models.CharField(max_length=100, blank=True, null=True)
     nro_calle = models.CharField(max_length=10, blank=True, null=True)
     piso = models.CharField(max_length=10, blank=True, null=True)
@@ -20,8 +20,7 @@ class Domicilio(models.Model):
         db_table = 'domicilio'
 
 
-#PERSONAS
-class Personas(models.Model):
+class Personas(BaseModel):
     nombre = models.CharField(max_length=256, blank=True, null=True)
     apellido = models.CharField(max_length=256, blank=True, null=True)
     dni = models.CharField(unique=True, max_length=256, blank=True, null=True)

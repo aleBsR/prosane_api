@@ -1,9 +1,10 @@
 import uuid
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, AbstractUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from common.models import BaseModel
 
 
-class Roles(models.Model):
+class Roles(BaseModel):
     rol = models.CharField(max_length=50, blank=True, null=True)
     ruta = models.CharField(max_length=100, blank=True, null=True)
 
@@ -14,26 +15,22 @@ class Roles(models.Model):
 
 class UserManager(BaseUserManager):
 
-    #**extra_fields es un diccionario que permite pasar campos adicionales al crear un usuario. 
-    #Esto es útil para agregar campos personalizados al modelo de usuario sin tener que modificar la firma del método create_user.
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError('The email field must be provided')
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
-        user.set_password(password) 
-        #set_password es un método proporcionado por AbstractBaseUser hashea
-        # la contraseña antes de almacenarla en la base de datos.
-        user.save() #Guarda el usuario en la base de datos utilizando el método save() del modelo. 
+        user.set_password(password)
+        user.save()
         return user
-    
-    def create_superuser(self,email, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser',True)
-        return self.create_user(email,password, **extra_fields)
-        
 
-class Usuarios(AbstractBaseUser,PermissionsMixin):
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, password, **extra_fields)
+
+
+class Usuarios(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     persona = models.ForeignKey(
         'core.Personas', models.DO_NOTHING,
@@ -42,38 +39,28 @@ class Usuarios(AbstractBaseUser,PermissionsMixin):
     email = models.EmailField(unique=True, max_length=256, blank=True, null=True)
     password = models.CharField(max_length=256, db_column='password_hash', blank=True, null=True)
 
-    is_active = models.BooleanField(default=True) #Indica si el usuario está activo o no. 
-    #Si es False, el usuario no podrá iniciar sesión ni realizar acciones en la aplicación.
-    #Is_active lo utiliza JWT para verificar si el usuario está activo antes de generar un token de acceso. 
-    is_staff = models.BooleanField(default=False) #Indica si el usuario tiene permisos de administrador o no. 
-    #Si es True, el usuario podrá acceder al panel de administración de Django y realizar acciones administrativas en la aplicación.
-    date_joined = models.DateTimeField(auto_now_add=True) #Almacena la fecha y hora en que el usuario se unió a la aplicación.
+    is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(auto_now_add=True)
 
-
-    USERNAME_FIELD = 'email' #Indica que el campo email se utilizará como el identificador único para autenticar a los usuarios en lugar del campo username predeterminado. Esto significa que los usuarios iniciarán sesión utilizando su dirección de correo electrónico en lugar de un nombre de usuario tradicional.
-
-    #objects es el administrador personalizado que se utilizará para crear usuarios y superusuarios
+    USERNAME_FIELD = 'email'
     objects = UserManager()
 
     roles = models.ManyToManyField(
-            Roles,
-            through='UserRole',
-            through_fields=('id_user', 'id_rol'),
-            related_name='usuarios' #nombre inverso
-                                   )
+        Roles,
+        through='UserRole',
+        through_fields=('id_user', 'id_rol'),
+        related_name='usuarios'
+    )
 
     class Meta:
-        managed = False 
-        db_table = 'usuarios' #Especifica el nombre en la db
+        managed = False
+        db_table = 'usuarios'
 
 
-class UserRole(models.Model):
-    id = models.AutoField(primary_key=True)
+class UserRole(BaseModel):
     id_rol = models.ForeignKey(Roles, models.DO_NOTHING, db_column='id_rol')
     id_user = models.ForeignKey(Usuarios, models.DO_NOTHING, db_column='id_user')
-    # se crea la fecha automaticamente
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False

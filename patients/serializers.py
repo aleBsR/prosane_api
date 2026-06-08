@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from core.models import Personas, Domicilio
 from core.serializers import PersonasSerializer, DomicilioSerializer
+from common.serializers import AuditSerializerMixin
 from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales
 
 class ResponsablesSerializer(serializers.ModelSerializer):
@@ -20,8 +21,7 @@ class ResponsablesSerializer(serializers.ModelSerializer):
         return instance
 
 
-class PacientesSerializer(serializers.ModelSerializer):
-    # Las ForeignKeys en Pacientes ahora se llaman 'persona', 'domicilio', 'responsable'
+class PacientesSerializer(AuditSerializerMixin, serializers.ModelSerializer):
     persona = PersonasSerializer()
     domicilio = DomicilioSerializer()
 
@@ -31,19 +31,20 @@ class PacientesSerializer(serializers.ModelSerializer):
             'id', 'persona', 'domicilio', 'responsable',
             'edad', 'tiene_cud', 'tipo_cobertura', 'nombre_cobertura'
         ]
+        read_only_fields = AuditSerializerMixin.AUDIT_READ_ONLY_FIELDS
 
     @transaction.atomic
     def create(self, validated_data):
         persona_data = validated_data.pop('persona')
         domicilio_data = validated_data.pop('domicilio')
 
-        # 1. Crear Persona
+        actor = self._actor()
+        if actor is not None and getattr(actor, 'is_authenticated', False):
+            validated_data['created_by'] = actor
+            validated_data['updated_by'] = actor
+
         persona = Personas.objects.create(**persona_data)
-
-        # 2. Crear Domicilio
         domicilio = Domicilio.objects.create(**domicilio_data)
-
-        # 3. Crear Paciente
         paciente = Pacientes.objects.create(
             persona=persona,
             domicilio=domicilio,
@@ -56,7 +57,10 @@ class PacientesSerializer(serializers.ModelSerializer):
         persona_data = validated_data.pop('persona', None)
         domicilio_data = validated_data.pop('domicilio', None)
 
-        # 1. Actualizar Persona
+        actor = self._actor()
+        if actor is not None and getattr(actor, 'is_authenticated', False):
+            validated_data['updated_by'] = actor
+
         if persona_data:
             persona = instance.persona
             for attr, value in persona_data.items():

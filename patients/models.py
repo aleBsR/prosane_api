@@ -1,7 +1,8 @@
 from django.db import models
+from common.models import BaseModel
 
 
-class Responsables(models.Model):
+class Responsables(BaseModel):
     parentesco = models.CharField(max_length=50)
     persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona', null=True, blank=True)
     usuario = models.ForeignKey('authentication.Usuarios', models.DO_NOTHING, db_column='usuario', null=True, blank=True)
@@ -11,7 +12,7 @@ class Responsables(models.Model):
         db_table = 'responsables'
 
 
-class Pacientes(models.Model):
+class Pacientes(BaseModel):
     domicilio = models.ForeignKey('core.Domicilio', models.DO_NOTHING, db_column='id_domicilio')
     responsable = models.ForeignKey(Responsables, models.DO_NOTHING, db_column='id_responsable', null=True)
     persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
@@ -25,7 +26,7 @@ class Pacientes(models.Model):
         db_table = 'pacientes'
 
 
-class Antecedentesfamiliares(models.Model):
+class Antecedentesfamiliares(BaseModel):
     paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
     problemas_salud = models.CharField(max_length=10, blank=True, null=True)
     detalle_problema_salud = models.CharField(max_length=255, blank=True, null=True)
@@ -36,8 +37,7 @@ class Antecedentesfamiliares(models.Model):
         db_table = 'antecedentesfamiliares'
 
 
-class Antecedentespersonales(models.Model):
-    antecedente = models.AutoField(primary_key=True, db_column='id_antecedente')
+class Antecedentespersonales(BaseModel):
     paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
     nacio_prematuro = models.CharField(max_length=10)
     peso_nacimiento = models.CharField(max_length=10)
