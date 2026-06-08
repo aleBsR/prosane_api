@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from common.managers import SoftDeleteManager
+from common.managers import SoftDeleteManager, SoftDeleteQuerySet
 
 
 class UUIDPrimaryKeyModel(models.Model):
@@ -36,13 +36,19 @@ class AuditModel(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     objects = SoftDeleteManager()
-    all_objects = models.Manager()
+    # Unfiltered: ve TODOS los registros (incluidos los borrados) y expone
+    # alive()/dead(). El delete() masivo por este manager también es soft;
+    # el borrado real es explícito vía hard_delete().
+    all_objects = SoftDeleteQuerySet.as_manager()
 
     class Meta:
         abstract = True
 
     def delete(self, using=None, keep_parents=False):
-        """Soft delete: marca deleted_at en vez de borrar la fila."""
+        """Soft delete: marca deleted_at en vez de borrar la fila.
+
+        Nota: devuelve None (no la tupla (count, {label: count}) de Django).
+        """
         self.deleted_at = timezone.now()
         self.save(update_fields=["deleted_at", "updated_at"])
 

@@ -4,6 +4,7 @@ from django.test import TransactionTestCase
 from django.test.utils import isolate_apps
 
 from common.models import BaseModel
+from core.models import Personas
 
 
 class AuditModelTestCase(TransactionTestCase):
@@ -17,13 +18,13 @@ class AuditModelTestCase(TransactionTestCase):
     SQLite necesita deshabilitar foreign keys, lo que no es posible dentro de
     un bloque atómico (que TestCase usa para aislar cada test).
 
-    Después de activar isolate_apps copiamos los modelos de authentication del
-    registro global al aislado para que las ForeignKey de AuditModel puedan
-    resolverse.
+    Después de activar isolate_apps copiamos los modelos de authentication al
+    registro aislado para que las ForeignKey de AuditModel resuelvan.
 
-    En setUp creamos la tabla personas (managed=False en el proyecto, pero
-    necesaria en el test DB porque Usuarios tiene FK nullable a ella y SQLite
-    verifica constraints aunque el valor sea NULL). La borramos en tearDown.
+    Creamos también la tabla `personas` (managed=False en el proyecto, así que
+    las migraciones no la crean en el test DB) porque Usuarios tiene una FK
+    nullable a ella y SQLite verifica la referencia. La construimos desde el
+    modelo real con schema_editor para que no haya drift de esquema.
     """
 
     @classmethod
@@ -31,9 +32,10 @@ class AuditModelTestCase(TransactionTestCase):
         super().setUpClass()
         cls._app_isolation = isolate_apps("common", "authentication")
         isolated_apps = cls._app_isolation.enable()
+        cls.addClassCleanup(cls._app_isolation.disable)
 
-        # Re-register real authentication models into the isolated registry so
-        # that ForeignKey(settings.AUTH_USER_MODEL) resolves correctly.
+        # Re-registrar los modelos reales de authentication en el registro
+        # aislado para que ForeignKey(settings.AUTH_USER_MODEL) resuelva.
         for model in global_apps.get_app_config("authentication").get_models():
             isolated_apps.all_models[model._meta.app_label][
                 model._meta.model_name
@@ -48,32 +50,20 @@ class AuditModelTestCase(TransactionTestCase):
         cls.AuditExample = AuditExample
 
         with connection.schema_editor() as schema_editor:
+            schema_editor.create_model(Personas)
             schema_editor.create_model(AuditExample)
 
+        cls.addClassCleanup(cls._drop_tables)
+
     @classmethod
-    def tearDownClass(cls):
+    def _drop_tables(cls):
         with connection.schema_editor() as schema_editor:
             schema_editor.delete_model(cls.AuditExample)
-        cls._app_isolation.disable()
-        super().tearDownClass()
-
-    def setUp(self):
-        super().setUp()
-        # Create the personas table that Usuarios has a nullable FK to.
-        # core.Personas is managed=False so it's never created by migrations
-        # in the test DB, but SQLite still validates FK references on insert.
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "CREATE TABLE IF NOT EXISTS personas "
-                "(id INTEGER PRIMARY KEY, nombre VARCHAR(256), "
-                "apellido VARCHAR(256), dni VARCHAR(256), tipo_dni VARCHAR(256))"
-            )
+            schema_editor.delete_model(Personas)
 
     def tearDown(self):
-        # Clear the ephemeral AuditExample rows (TransactionTestCase flushes
-        # only models known to the real app registry; our isolated model is
-        # not in it, so we clean it up manually).
-        self.AuditExample.all_objects.all().delete()
-        with connection.cursor() as cursor:
-            cursor.execute("DROP TABLE IF EXISTS personas")
+        # Limpiamos las filas efímeras: TransactionTestCase solo vacía modelos
+        # del registro real, no nuestro AuditExample aislado. Usamos hard_delete
+        # porque el delete() masivo de all_objects ahora es soft.
+        self.AuditExample.all_objects.all().hard_delete()
         super().tearDown()

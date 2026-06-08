@@ -55,6 +55,27 @@ class SoftDeleteTests(AuditModelTestCase):
         self.assertEqual(self.AuditExample.objects.count(), 0)
         self.assertEqual(self.AuditExample.all_objects.count(), 2)
 
+    def test_all_objects_exposes_alive_and_dead(self):
+        alive_obj = self.AuditExample.objects.create(name="alive")
+        dead_obj = self.AuditExample.objects.create(name="dead")
+        dead_obj.delete()
+
+        alive_pks = set(
+            self.AuditExample.all_objects.alive().values_list("pk", flat=True)
+        )
+        dead_pks = set(
+            self.AuditExample.all_objects.dead().values_list("pk", flat=True)
+        )
+        self.assertEqual(alive_pks, {alive_obj.pk})
+        self.assertEqual(dead_pks, {dead_obj.pk})
+
+    def test_all_objects_queryset_delete_is_soft(self):
+        self.AuditExample.objects.create(name="a")
+        self.AuditExample.objects.create(name="b")
+        self.AuditExample.all_objects.all().delete()
+        self.assertEqual(self.AuditExample.objects.count(), 0)
+        self.assertEqual(self.AuditExample.all_objects.count(), 2)
+
 
 class ActorTests(AuditModelTestCase):
     def test_created_by_and_updated_by_stored(self):

@@ -4,7 +4,8 @@ from django.utils import timezone
 
 class SoftDeleteQuerySet(models.QuerySet):
     def delete(self):
-        return self.update(deleted_at=timezone.now())
+        now = timezone.now()
+        return self.update(deleted_at=now, updated_at=now)
 
     def hard_delete(self):
         return super().delete()
