@@ -1,0 +1,57 @@
+{% extends "apidocs/base.html" %}
+{% block title %}Autenticación y Roles — PROSANE API{% endblock %}
+{% block content %}
+<h1>Autenticación y Roles</h1>
+
+<h2>Modelo de usuario</h2>
+<p>El sistema usa un modelo de usuario personalizado (<code>Usuarios</code>) con <strong>email como identificador</strong> de login y <strong>UUID</strong> como PK.</p>
+
+<h2>Roles disponibles</h2>
+<table>
+  <thead>
+    <tr><th>Rol</th><th>Permisos</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>admin</code></td><td>Acceso total. Puede asignar roles a usuarios.</td></tr>
+    <tr><td><code>medico</code></td><td>Acceso a datos clínicos de pacientes. Puede ver contenido exclusivo para médicos.</td></tr>
+    <tr><td><code>odontologo</code></td><td>Similar a médico, con alcance odontológico.</td></tr>
+    <tr><td><code>tutor</code></td><td>Acceso a sus propios hijos/pacientes a cargo. Solo ve lo que el profesional marca como visible.</td></tr>
+    <tr><td><code>ayudante</code></td><td>Rol auxiliar con permisos limitados.</td></tr>
+  </tbody>
+</table>
+
+<h2>JWT (JSON Web Token)</h2>
+<p>La autenticación usa <strong>SimpleJWT</strong>. El token incluye los roles del usuario en el payload para autorización stateless (sin consultar la BD en cada request).</p>
+
+<h3>Headers</h3>
+<pre><code>Authorization: Bearer &lt;token&gt;
+Content-Type: application/json</code></pre>
+
+<h3>Configuración del token</h3>
+<table>
+  <thead>
+    <tr><th>Parámetro</th><th>Valor</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>ACCESS_TOKEN_LIFETIME</td><td>60 minutos</td></tr>
+    <tr><td>REFRESH_TOKEN_LIFETIME</td><td>1 día</td></tr>
+    <tr><td>ROTATE_REFRESH_TOKENS</td><td>True</td></tr>
+    <tr><td>ALGORITHM</td><td>HS256</td></tr>
+    <tr><td>AUTH_HEADER_TYPES</td><td>Bearer</td></tr>
+  </tbody>
+</table>
+
+<h2>Flujo de autenticación</h2>
+<ol>
+  <li>El usuario se registra (<code>/auth/register/</code>, <code>/auth/register-tutor/</code> o <code>/auth/register-profesional/</code>)</li>
+  <li>Inicia sesión en <code>/auth/login/</code> y obtiene un JWT</li>
+  <li>Envía el token en el header <code>Authorization: Bearer &lt;token&gt;</code> en cada request</li>
+  <li>El token expira en 60 min; debe renovarse</li>
+</ol>
+
+<div style="background: var(--bg-code); border: 1px solid var(--border); border-radius: 6px; padding: 16px; margin-top: 24px;">
+  <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+    <strong>Nota:</strong> Actualmente no hay endpoint de refresh de token implementado. Es un punto pendiente.
+  </p>
+</div>
+{% endblock %}

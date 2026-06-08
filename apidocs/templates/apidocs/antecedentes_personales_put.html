@@ -1,0 +1,79 @@
+{% extends "apidocs/base.html" %}
+{% block title %}PUT /api/v1/{id}/antecedentes-personales/ — PROSANE API{% endblock %}
+{% block content %}
+<h1>Guardar antecedentes personales</h1>
+
+<div class="endpoint-card">
+  <div class="endpoint-header">
+    <span class="endpoint-method put">PUT</span>
+    <span class="endpoint-url">/api/v1/&lt;id&gt;/antecedentes-personales/</span>
+    <span class="endpoint-auth">Requiere: Autenticación</span>
+  </div>
+  <div class="endpoint-body">
+    <h4>Descripción</h4>
+    <p>Crea o actualiza los antecedentes personales de un paciente (upsert). Si no existen, se crean con valores por defecto y luego se aplica la actualización parcial.</p>
+
+    <h4>Request Body</h4>
+    <pre><code>{
+  "nacio_prematuro": "NO",
+  "peso_nacimiento": "3.200",
+  "convulsiones_epilepsia": "NO",
+  "mareos_desmayos": "NO",
+  "asma_espasmos": "NO",
+  "diabetes": "NO",
+  "cardiopatia_congenita": "NO",
+  "otras_enfermedades": "NINGUNO"
+}</code></pre>
+
+    <h4>Response — <code style="color: var(--success);">200 OK</code> (actualizado) o <code style="color: var(--success);">201 Created</code> (nuevo)</h4>
+    <pre><code>{
+  "nacio_prematuro": "NO",
+  "peso_nacimiento": "3.200",
+  "convulsiones_epilepsia": "NO",
+  "mareos_desmayos": "NO",
+  "infecciones_urinarias": "NO",
+  "asma_espasmos": "NO",
+  "tuberculosis": "NO",
+  "diabetes": "NO",
+  "hipertension": "NO",
+  "cardiopatia_congenita": "NO",
+  ...
+}</code></pre>
+
+    <h4>Campos del request (lista completa)</h4>
+    <table>
+      <thead>
+        <tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>nacio_prematuro</code></td><td>string</td><td>SI/NO</td></tr>
+        <tr><td><code>peso_nacimiento</code></td><td>string</td><td>Peso al nacer en kg</td></tr>
+        <tr><td><code>convulsiones_epilepsia</code></td><td>string</td><td>SI/NO</td></tr>
+        <tr><td><code>mareos_desmayos</code></td><td>string</td><td>SI/NO</td></tr>
+        <tr><td><code>infecciones_urinarias</code></td><td>string</td><td>SI/NO</td></tr>
+        <tr><td><code>asma_espasmos</code></td><td>string</td><td>SI/NO</td></tr>
+        <tr><td><code>tuberculosis</code></td><td>string</td><td>SI/NO</td></tr>
+        <tr><td><code>diabetes</code></td><td>string</td><td>SI/NO</td></tr>
+        <tr><td><code>hipertension</code></td><td>string</td><td>SI/NO</td></tr>
+        <tr><td><code>cardiopatia_congenita</code></td><td>string</td><td>SI/NO</td></tr>
+        <tr><td><code>traumatismo_internacion</code></td><td>string</td><td>Descripción</td></tr>
+        <tr><td><code>diarrea_frecuente</code></td><td>string</td><td>Descripción</td></tr>
+        <tr><td><code>infecciones_oido</code></td><td>string</td><td>Descripción</td></tr>
+        <tr><td><code>causa_hospitalizacion</code></td><td>string</td><td>Descripción</td></tr>
+        <tr><td><code>rabia_tratamiento</code></td><td>string</td><td>Descripción</td></tr>
+        <tr><td><code>descripcion_tratamiento</code></td><td>string</td><td>Descripción del tratamiento</td></tr>
+        <tr><td><code>ultima_consulta_medica</code></td><td>string</td><td>Fecha o descripción</td></tr>
+        <tr><td><code>otros_problemas_salud</code></td><td>string</td><td>Descripción</td></tr>
+        <tr><td><code>primera_menstruacion</code></td><td>string</td><td>SI/NO (solo para sexo femenino)</td></tr>
+        <tr><td><code>edad_primera_menstruacion</code></td><td>integer</td><td>Edad en años</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Ejemplo con curl</h4>
+    <pre><code>curl -X PUT http://localhost:8000/api/v1/1/antecedentes-personales/ \
+  -H "Authorization: Bearer &lt;token&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"nacio_prematuro": "NO", "peso_nacimiento": "3.200"}'</code></pre>
+  </div>
+</div>
+{% endblock %}

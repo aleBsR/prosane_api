@@ -1,0 +1,34 @@
+{% extends "apidocs/base.html" %}
+{% block title %}GET /api/v1/responsable/ — PROSANE API{% endblock %}
+{% block content %}
+<h1>Ver perfil del responsable</h1>
+
+<div class="endpoint-card">
+  <div class="endpoint-header">
+    <span class="endpoint-method get">GET</span>
+    <span class="endpoint-url">/api/v1/responsable/</span>
+    <span class="endpoint-auth">Requiere: Autenticación</span>
+  </div>
+  <div class="endpoint-body">
+    <h4>Descripción</h4>
+    <p>Obtiene el perfil del tutor/responsable asociado al usuario autenticado.</p>
+
+    <h4>Response — <code style="color: var(--success);">200 OK</code></h4>
+    <pre><code>{
+  "id": 1,
+  "usuario": "uuid-del-usuario",
+  "persona": 5,
+  "parentesco": "madre"
+}</code></pre>
+
+    <h4>Response — <code style="color: var(--warning);">404 Not Found</code></h4>
+    <pre><code>{
+  "detail": "No se encontró un perfil de tutor/responsable para este usuario."
+}</code></pre>
+
+    <h4>Ejemplo con curl</h4>
+    <pre><code>curl -X GET http://localhost:8000/api/v1/responsable/ \
+  -H "Authorization: Bearer &lt;token&gt;"</code></pre>
+  </div>
+</div>
+{% endblock %}

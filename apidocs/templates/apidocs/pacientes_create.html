@@ -1,0 +1,71 @@
+{% extends "apidocs/base.html" %}
+{% block title %}POST /api/v1/ — PROSANE API{% endblock %}
+{% block content %}
+<h1>Crear paciente</h1>
+
+<div class="endpoint-card">
+  <div class="endpoint-header">
+    <span class="endpoint-method post">POST</span>
+    <span class="endpoint-url">/api/v1/</span>
+    <span class="endpoint-auth">Requiere: Autenticación</span>
+  </div>
+  <div class="endpoint-body">
+    <h4>Descripción</h4>
+    <p>Crea un nuevo paciente con sus datos personales y domicilio. Si el usuario autenticado es un tutor, el responsable se asigna automáticamente.</p>
+
+    <h4>Request Body</h4>
+    <pre><code>{
+  "persona": {
+    "nombre": "Lucía",
+    "apellido": "García",
+    "dni": "12345678",
+    "tipo_dni": "DNI",
+    "sexo": "F",
+    "fecha_nacimiento": "2015-06-10"
+  },
+  "domicilio": {
+    "calle": "Av. Ejemplo",
+    "nro_calle": "1234",
+    "piso": "",
+    "dpto": "",
+    "provincia": "Salta",
+    "departamento": "Capital",
+    "localidad": "Salta"
+  },
+  "edad": 10,
+  "tiene_cud": "NO",
+  "tipo_cobertura": "PUBLICA",
+  "nombre_cobertura": ""
+}</code></pre>
+
+    <h4>Response — <code style="color: var(--success);">201 Created</code></h4>
+    <pre><code>{
+  "id": 1,
+  "persona": { ... },
+  "domicilio": { ... },
+  "responsable": 1,
+  "edad": 10,
+  "tiene_cud": "NO",
+  "tipo_cobertura": "PUBLICA",
+  "nombre_cobertura": "",
+  "responsable_detalle": { ... }
+}</code></pre>
+
+    <h4>Campos del request</h4>
+    <table>
+      <thead>
+        <tr><th>Campo</th><th>Tipo</th><th>Requerido</th><th>Descripción</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>persona.*</code></td><td>object</td><td>Sí</td><td>Datos personales del paciente</td></tr>
+        <tr><td><code>domicilio.*</code></td><td>object</td><td>Sí</td><td>Domicilio del paciente</td></tr>
+        <tr><td><code>edad</code></td><td>integer</td><td>Sí</td><td>Edad del paciente</td></tr>
+        <tr><td><code>tiene_cud</code></td><td>string</td><td>No</td><td>"SI" o "NO" (CUD = Certificado Único de Discapacidad)</td></tr>
+        <tr><td><code>tipo_cobertura</code></td><td>string</td><td>No</td><td>"PUBLICA", "PRIVADA" u "OBRA_SOCIAL"</td></tr>
+        <tr><td><code>nombre_cobertura</code></td><td>string</td><td>No</td><td>Nombre de la cobertura médica</td></tr>
+        <tr><td><code>responsable</code></td><td>integer</td><td>No*</td><td>ID del responsable. Se asigna automáticamente si el usuario autenticado es tutor</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

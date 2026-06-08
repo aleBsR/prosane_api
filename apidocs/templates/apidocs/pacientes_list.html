@@ -1,0 +1,60 @@
+{% extends "apidocs/base.html" %}
+{% block title %}GET /api/v1/ — PROSANE API{% endblock %}
+{% block content %}
+<h1>Listar pacientes</h1>
+
+<div class="endpoint-card">
+  <div class="endpoint-header">
+    <span class="endpoint-method get">GET</span>
+    <span class="endpoint-url">/api/v1/</span>
+    <span class="endpoint-auth">Requiere: Autenticación</span>
+  </div>
+  <div class="endpoint-body">
+    <h4>Descripción</h4>
+    <p>Obtiene la lista de pacientes asociados al tutor autenticado. Busca al responsable por usuario autenticado o por persona asociada.</p>
+
+    <h4>Response — <code style="color: var(--success);">200 OK</code></h4>
+    <pre><code>[
+  {
+    "id": 1,
+    "persona": {
+      "nombre": "Lucía",
+      "apellido": "García",
+      "dni": "12345678",
+      "tipo_dni": "DNI",
+      "sexo": "F",
+      "fecha_nacimiento": "2015-06-10"
+    },
+    "domicilio": {
+      "calle": "Av. Ejemplo",
+      "nro_calle": "1234",
+      "piso": null,
+      "dpto": null,
+      "manzana": null,
+      "casa": null,
+      "nro_casa": null,
+      "pieza": null,
+      "provincia": "Salta",
+      "departamento": "Capital",
+      "localidad": "Salta"
+    },
+    "responsable": 1,
+    "edad": 10,
+    "tiene_cud": "NO",
+    "tipo_cobertura": "PUBLICA",
+    "nombre_cobertura": "",
+    "responsable_detalle": {
+      "id": 1,
+      "parentesco": "madre",
+      "nombre": "María",
+      "apellido": "García"
+    }
+  }
+]</code></pre>
+
+    <h4>Ejemplo con curl</h4>
+    <pre><code>curl -X GET http://localhost:8000/api/v1/ \
+  -H "Authorization: Bearer &lt;token&gt;"</code></pre>
+  </div>
+</div>
+{% endblock %}

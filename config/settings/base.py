@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'authentication',
     'patients',
     'professionals',
+    'apidocs',
 ]
 
 AUTH_USER_MODEL = 'authentication.Usuarios'

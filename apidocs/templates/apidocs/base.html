@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}PROSANE API — Documentación{% endblock %}</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'apidocs/style.css' %}">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>PROSANE API</h1>
+      <p>Documentación de endpoints</p>
+    </div>
+    <ul class="sidebar-nav">
+      <li class="nav-section">Introducción</li>
+      <li><a href="{% url 'apidocs:inicio' %}" {% if active == 'inicio' %}class="active"{% endif %}>Inicio</a></li>
+      <li><a href="{% url 'apidocs:autenticacion' %}" {% if active == 'autenticacion' %}class="active"{% endif %}>Autenticación y Roles</a></li>
+
+      <li class="nav-section">Auth</li>
+      <li><a href="{% url 'apidocs:auth_register' %}" {% if active == 'auth_register' %}class="active"{% endif %}><span class="method-tag post">POST</span>Register</a></li>
+      <li><a href="{% url 'apidocs:auth_register_tutor' %}" {% if active == 'auth_register_tutor' %}class="active"{% endif %}><span class="method-tag post">POST</span>Registro Tutor</a></li>
+      <li><a href="{% url 'apidocs:auth_register_profesional' %}" {% if active == 'auth_register_profesional' %}class="active"{% endif %}><span class="method-tag post">POST</span>Registro Profesional</a></li>
+      <li><a href="{% url 'apidocs:auth_login' %}" {% if active == 'auth_login' %}class="active"{% endif %}><span class="method-tag post">POST</span>Login</a></li>
+      <li><a href="{% url 'apidocs:auth_asignar_rol' %}" {% if active == 'auth_asignar_rol' %}class="active"{% endif %}><span class="method-tag post">POST</span>Asignar Rol</a></li>
+
+      <li class="nav-section">Pacientes</li>
+      <li><a href="{% url 'apidocs:pacientes_list' %}" {% if active == 'pacientes_list' %}class="active"{% endif %}><span class="method-tag get">GET</span>Listar Pacientes</a></li>
+      <li><a href="{% url 'apidocs:pacientes_create' %}" {% if active == 'pacientes_create' %}class="active"{% endif %}><span class="method-tag post">POST</span>Crear Paciente</a></li>
+      <li><a href="{% url 'apidocs:pacientes_detail' %}" {% if active == 'pacientes_detail' %}class="active"{% endif %}><span class="method-tag get">GET</span>Detalle Paciente</a></li>
+      <li><a href="{% url 'apidocs:pacientes_update' %}" {% if active == 'pacientes_update' %}class="active"{% endif %}><span class="method-tag put">PUT</span>Actualizar Paciente</a></li>
+      <li><a href="{% url 'apidocs:pacientes_delete' %}" {% if active == 'pacientes_delete' %}class="active"{% endif %}><span class="method-tag delete">DELETE</span>Eliminar Paciente</a></li>
+
+      <li class="nav-section">Antecedentes</li>
+      <li><a href="{% url 'apidocs:antecedentes_familiares' %}" {% if active == 'antecedentes_familiares' %}class="active"{% endif %}><span class="method-tag get">GET</span>Ant. Familiares</a></li>
+      <li><a href="{% url 'apidocs:antecedentes_familiares_put' %}" {% if active == 'antecedentes_familiares_put' %}class="active"{% endif %}><span class="method-tag put">PUT</span>Guardar Ant. Familiares</a></li>
+      <li><a href="{% url 'apidocs:antecedentes_personales' %}" {% if active == 'antecedentes_personales' %}class="active"{% endif %}><span class="method-tag get">GET</span>Ant. Personales</a></li>
+      <li><a href="{% url 'apidocs:antecedentes_personales_put' %}" {% if active == 'antecedentes_personales_put' %}class="active"{% endif %}><span class="method-tag put">PUT</span>Guardar Ant. Personales</a></li>
+
+      <li class="nav-section">Responsable</li>
+      <li><a href="{% url 'apidocs:responsable_perfil' %}" {% if active == 'responsable_perfil' %}class="active"{% endif %}><span class="method-tag get">GET</span>Ver Perfil</a></li>
+      <li><a href="{% url 'apidocs:responsable_perfil_put' %}" {% if active == 'responsable_perfil_put' %}class="active"{% endif %}><span class="method-tag put">PUT</span>Actualizar Perfil</a></li>
+    </ul>
+  </aside>
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
