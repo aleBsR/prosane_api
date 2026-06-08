@@ -16,7 +16,13 @@ class UUIDPrimaryKeyModel(models.Model):
 
 class AuditModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    created_year = models.IntegerField(null=True, blank=True, db_index=True)
+    created_year_month = models.CharField(max_length=7, null=True, blank=True, db_index=True)
+
     updated_at = models.DateTimeField(auto_now=True)
+    updated_year = models.IntegerField(null=True, blank=True)
+    updated_year_month = models.CharField(max_length=7, null=True, blank=True)
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -36,20 +42,31 @@ class AuditModel(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     objects = SoftDeleteManager()
-    # Unfiltered: ve TODOS los registros (incluidos los borrados) y expone
-    # alive()/dead(). El delete() masivo por este manager también es soft;
-    # el borrado real es explícito vía hard_delete().
     all_objects = SoftDeleteQuerySet.as_manager()
 
     class Meta:
         abstract = True
 
-    def delete(self, using=None, keep_parents=False):
-        """Soft delete: marca deleted_at en vez de borrar la fila.
+    def save(self, *args, **kwargs):
+        now = timezone.now()
+        if not self.pk:
+            self.created_year = now.year
+            self.created_year_month = now.strftime('%Y-%m')
+        self.updated_year = now.year
+        self.updated_year_month = now.strftime('%Y-%m')
+        super().save(*args, **kwargs)
 
-        Nota: devuelve None (no la tupla (count, {label: count}) de Django).
-        """
+    def delete(self, using=None, keep_parents=False):
+        """Soft delete: marca deleted_at en vez de borrar la fila."""
         self.deleted_at = timezone.now()
+        self.save(update_fields=["deleted_at", "updated_at"])
+
+    def hard_delete(self, using=None, keep_parents=False):
+        """Borrado real de la fila. Explícito, para casos puntuales."""
+        super().delete(using=using, keep_parents=keep_parents)
+
+    def restore(self):
+        self.deleted_at = None
         self.save(update_fields=["deleted_at", "updated_at"])
 
     def hard_delete(self, using=None, keep_parents=False):

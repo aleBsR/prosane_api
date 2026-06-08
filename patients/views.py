@@ -45,7 +45,7 @@ class PacienteListCreateAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        serializer = PacientesSerializer(data=data)
+        serializer = PacientesSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -65,7 +65,7 @@ class PacienteDetailAPIView(APIView):
 
     def put(self, request, pk):
         paciente = self.get_object(pk)
-        serializer = PacientesSerializer(paciente, data=request.data)
+        serializer = PacientesSerializer(paciente, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -73,7 +73,7 @@ class PacienteDetailAPIView(APIView):
 
     def patch(self, request, pk):
         paciente = self.get_object(pk)
-        serializer = PacientesSerializer(paciente, data=request.data, partial=True)
+        serializer = PacientesSerializer(paciente, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
