@@ -1,10 +1,13 @@
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from rest_framework.response import Response
 from rest_framework import status
 
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
+
+from authentication.me import build_me_payload
 
 from authentication.models import Roles, Usuarios
 from authentication.serializers import (
@@ -90,3 +93,17 @@ def asignar_rol(request, id):
 @permission_classes([EsMedico])
 def solo_medicos(request):
     return Response({'message': 'Solo medicos pueden ver esto'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def me(request):
+    """Sesión del usuario autenticado: datos + roles + acciones (contrato congelado).
+
+    Fase 1: las acciones se derivan de los roles que viajan en el claim `roles` del
+    token (emitido por getCustomToken). En Fase 2 saldrán de la DB sin cambiar la forma
+    de la respuesta. Usa el permiso default (IsAuthenticated).
+    """
+    roles_claim = request.auth.get('roles', []) if request.auth else []
+    role_names = [r.get('rol') for r in roles_claim if isinstance(r, dict) and r.get('rol')]
+    payload = build_me_payload(request.user, role_names, now=timezone.now())
+    return Response(payload)
