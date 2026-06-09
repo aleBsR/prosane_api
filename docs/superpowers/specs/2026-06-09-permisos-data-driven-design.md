@@ -66,9 +66,16 @@ se congela una sola vez** y no cambia entre fases.
 > El mapa `ROLE_ACTIONS` de Fase 1 es **un detalle de implementación de Fase 1**,
 > reemplazable en Fase 2 sin tocar el contrato.
 
+> 🚨 **FASE 1 NO VA A PRODUCCIÓN CON DATOS REALES — solo dev/demo.**
+> La Fase 1 entrega únicamente el contrato `/me` para el **gating del front**, y el
+> gating del front **NO es seguridad** (el cliente es manipulable). La seguridad real
+> es la enforcement server-side de Fase 2 (`ActionPermissionBackend` + `require_action`).
+> Con datos de salud de menores (Ley 25.326) **no puede haber endpoints sensibles sin
+> enforcement en producción, ni siquiera temporalmente**. Prod espera a Fase 2.
+
 ---
 
-## 3. Contrato CONGELADO: `GET /api/v1/me`
+## 3. Contrato CONGELADO: `GET /api/v1/auth/me`
 
 Requiere `Authorization: Bearer <access_token>`.
 
@@ -178,9 +185,19 @@ Notas:
 - **3 tablas core + 1 de auditoría.** Sin `user_actions` materializada ni
   `user_action_sources` (ver §5).
 
-⚠️ **Desvío del patrón del repo:** las tablas actuales son `managed=False` (vienen de
-`inspectdb`). Estas nuevas serían `managed=True` con migraciones Django reales. Acordado
-en principio, pero **requiere el OK de Roberto como dueño del schema** antes de migrar.
+### `managed = True` a propósito (decisión cerrada)
+
+Las 4 tablas nuevas se crean con **`managed = True`** y migraciones Django reales,
+**a diferencia** de las tablas heredadas vía `inspectdb` (que son `managed = False`
+porque su schema lo posee otro sistema). Razón:
+
+- Son **tablas nuevas, propias de esta feature**, sin integración externa que dependa de
+  su schema → **Django es el dueño natural** de su estructura.
+- Nos da **versionado y rollback de migraciones** de Django (crear/alterar/revertir con
+  historial), en vez de gestionar el DDL a mano.
+
+Queda documentado que esta convención (`managed=True`) es **deliberada y acotada a estas
+4 tablas**; no cambia el criterio `managed=False` del resto del repo.
 
 ---
 
@@ -363,16 +380,21 @@ volver al front. (No se toca desde este repo.)
 - **Nunca** loguear DNI/diagnósticos/emails en texto plano (ni en `action_logs.context`).
 - Acceso mínimo por rol; el backend no expone acciones que el usuario no tiene.
 - `action_logs` con snapshot de `action_name` para auditoría estable.
+- **Prod exige enforcement (Fase 2).** Ningún endpoint sensible va a producción apoyado
+  solo en el gating del front (Fase 1). Ver callout en §2.
 
 ---
 
-## 11. Decisiones abiertas / a confirmar por Roberto
+## 11. Decisiones cerradas (Roberto, 2026-06-09)
 
-1. **OK del schema** (§4) para pasar a migraciones (`managed=True`, desvío del patrón
-   `managed=False`).
-2. `roles` no tiene columna `label`; en Fase 1 el `label` de rol sale de un mapa en
-   código. ¿Agregar `label` a `roles` en Fase 2 o dejarlo en código? (additive)
-3. Path final del endpoint: `/api/v1/me` (propuesto) vs `/api/v1/auth/me`.
+1. **Schema:** las 4 tablas nuevas van con **`managed=True`** + migraciones Django (§4).
+   Aprobado para implementar Fase 2.
+2. **Fase 1 no productiva:** la Fase 1 (solo contrato `/me`, sin enforcement) **no va a
+   prod con datos reales** — dev/demo únicamente (ver callout en §2 y §10).
+3. **Path del endpoint:** **`/api/v1/auth/me`** (sesión agrupada bajo `/auth/`,
+   consistente con `/auth/token/refresh`). Clavado.
+4. **`label` de roles:** queda **en código** en Fase 1 (mapa). Es additive; si se decide
+   persistirlo (columna `label` en `roles`) se resuelve en Fase 2 sin romper contrato.
 
 ---
 
