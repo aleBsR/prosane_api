@@ -3,7 +3,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
+from django.db.models import Q
 
+from core.models import Personas
+from patients.models import Pacientes
+from patients.serializers import PacientesSerializer
 from .models import Profesionales
 from .serializers import (
     ProfesionalPerfilSerializer,
@@ -77,3 +81,27 @@ def validar_matricula(request):
         datos = RefepsService.consultar(serializer.validated_data['matricula'])
         return Response(datos, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BuscarPacienteAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        dni = request.query_params.get('dni', '').strip()
+
+        if not dni:
+            return Response(
+                {"detail": "Parámetro 'dni' requerido."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        personas = Personas.objects.filter(
+            Q(dni__icontains=dni) | Q(dni=dni)
+        )
+
+        pacientes = Pacientes.objects.filter(persona__in=personas).select_related(
+            'persona', 'domicilio', 'responsable__persona'
+        )
+
+        serializer = PacientesSerializer(pacientes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
