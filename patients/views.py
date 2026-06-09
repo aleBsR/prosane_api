@@ -7,38 +7,75 @@ from django.db import transaction
 
 from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales
 from .serializers import (
-    PacientesSerializer, 
-    ResponsablesSerializer, 
-    AntecedentesfamiliaresSerializer, 
+    PacientesSerializer,
+    ResponsablesSerializer,
+    AntecedentesfamiliaresSerializer,
     AntecedentespersonalesSerializer
 )
+from .permissions import (
+    PuedeListarPacientes,
+    PuedeCrearPaciente,
+    PuedeGestionarPaciente,
+    PuedeGestionarAntecedentes,
+    SoloPropioTutor,
+)
+
+
+def _get_roles(request):
+    if request.user.is_superuser:
+        return {'admin'}
+    return {r['rol'] for r in request.auth.get('roles', [])}
+
+
+def _tutor_owns_paciente(request, paciente):
+    """If user is tutor (not admin/medico), verify they own this patient."""
+    roles = _get_roles(request)
+    if 'admin' in roles or 'medico' in roles:
+        return True
+    if 'tutor' in roles:
+        return paciente.responsable.usuario == request.user
+    return False
+
 
 class PacienteListCreateAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PuedeListarPacientes]
 
     def get(self, request):
-        persona = getattr(request.user, 'persona', None)
+        roles = _get_roles(request)
 
-        try:
-            responsable = Responsables.objects.get(usuario=request.user)
-            pacientes = Pacientes.objects.filter(responsable=responsable)
-        except Responsables.DoesNotExist:
+        if 'tutor' in roles and not (roles & {'admin', 'medico', 'odontologo', 'ayudante'}):
+            paciente = getattr(request.user, 'persona', None)
             try:
-                responsable = Responsables.objects.get(persona=persona)
+                responsable = Responsables.objects.get(usuario=request.user)
                 pacientes = Pacientes.objects.filter(responsable=responsable)
             except Responsables.DoesNotExist:
-                pacientes = Pacientes.objects.none()
+                try:
+                    responsable = Responsables.objects.get(persona=paciente)
+                    pacientes = Pacientes.objects.filter(responsable=responsable)
+                except Responsables.DoesNotExist:
+                    pacientes = Pacientes.objects.none()
+        else:
+            pacientes = Pacientes.objects.select_related(
+                'persona', 'domicilio', 'responsable__persona'
+            ).all()
 
         serializer = PacientesSerializer(pacientes, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
+        roles = _get_roles(request)
         data = request.data.copy()
 
-        try:
-            responsable = Responsables.objects.get(usuario=request.user)
-            data['responsable'] = responsable.id
-        except Responsables.DoesNotExist:
+        if 'tutor' in roles:
+            try:
+                responsable = Responsables.objects.get(usuario=request.user)
+                data['responsable'] = responsable.id
+            except Responsables.DoesNotExist:
+                return Response(
+                    {"responsable": ["No tienes un perfil de tutor. Crea tu perfil primero."]},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif 'medico' in roles or 'admin' in roles:
             if 'responsable' not in data:
                 return Response(
                     {"responsable": ["Este campo es requerido."]},
@@ -53,18 +90,32 @@ class PacienteListCreateAPIView(APIView):
 
 
 class PacienteDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PuedeGestionarPaciente]
 
     def get_object(self, pk):
         return get_object_or_404(Pacientes, pk=pk)
 
+    def _check_perm(self, request, paciente):
+        if not _tutor_owns_paciente(request, paciente):
+            return Response(
+                {"detail": "No tienes permiso para acceder a este paciente."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return None
+
     def get(self, request, pk):
         paciente = self.get_object(pk)
+        error = self._check_perm(request, paciente)
+        if error:
+            return error
         serializer = PacientesSerializer(paciente)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk):
         paciente = self.get_object(pk)
+        error = self._check_perm(request, paciente)
+        if error:
+            return error
         serializer = PacientesSerializer(paciente, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
@@ -73,6 +124,9 @@ class PacienteDetailAPIView(APIView):
 
     def patch(self, request, pk):
         paciente = self.get_object(pk)
+        error = self._check_perm(request, paciente)
+        if error:
+            return error
         serializer = PacientesSerializer(paciente, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
@@ -81,15 +135,23 @@ class PacienteDetailAPIView(APIView):
 
     def delete(self, request, pk):
         paciente = self.get_object(pk)
+        error = self._check_perm(request, paciente)
+        if error:
+            return error
         paciente.delete()
         return Response({"message": "Paciente eliminado correctamente"}, status=status.HTTP_204_NO_CONTENT)
 
 
 class AntecedentesFamiliaresAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PuedeGestionarAntecedentes]
 
     def get(self, request, patient_id):
         paciente = get_object_or_404(Pacientes, pk=patient_id)
+        if not _tutor_owns_paciente(request, paciente):
+            return Response(
+                {"detail": "No tienes permiso para acceder a este paciente."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         try:
             antecedentes = Antecedentesfamiliares.objects.get(paciente=paciente)
             serializer = AntecedentesfamiliaresSerializer(antecedentes)
@@ -102,11 +164,16 @@ class AntecedentesFamiliaresAPIView(APIView):
 
     def put(self, request, patient_id):
         paciente = get_object_or_404(Pacientes, pk=patient_id)
+        if not _tutor_owns_paciente(request, paciente):
+            return Response(
+                {"detail": "No tienes permiso para acceder a este paciente."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         antecedentes, created = Antecedentesfamiliares.objects.get_or_create(paciente=paciente)
-        
+
         data = request.data.copy()
         data['paciente'] = paciente.id
-        
+
         serializer = AntecedentesfamiliaresSerializer(antecedentes, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -116,10 +183,15 @@ class AntecedentesFamiliaresAPIView(APIView):
 
 
 class AntecedentesPersonalesAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PuedeGestionarAntecedentes]
 
     def get(self, request, patient_id):
         paciente = get_object_or_404(Pacientes, pk=patient_id)
+        if not _tutor_owns_paciente(request, paciente):
+            return Response(
+                {"detail": "No tienes permiso para acceder a este paciente."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         try:
             antecedentes = Antecedentespersonales.objects.get(paciente=paciente)
             serializer = AntecedentespersonalesSerializer(antecedentes)
@@ -132,7 +204,12 @@ class AntecedentesPersonalesAPIView(APIView):
 
     def put(self, request, patient_id):
         paciente = get_object_or_404(Pacientes, pk=patient_id)
-        
+        if not _tutor_owns_paciente(request, paciente):
+            return Response(
+                {"detail": "No tienes permiso para acceder a este paciente."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         defaults_valores = {
             'nacio_prematuro': 'NO',
             'peso_nacimiento': '0',
@@ -155,15 +232,15 @@ class AntecedentesPersonalesAPIView(APIView):
             'primera_menstruacion': 'NO',
             'edad_primera_menstruacion': 0
         }
-        
+
         antecedentes, created = Antecedentespersonales.objects.get_or_create(
             paciente=paciente,
             defaults=defaults_valores
         )
-        
+
         data = request.data.copy()
         data['paciente'] = paciente.id
-        
+
         serializer = AntecedentespersonalesSerializer(antecedentes, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -173,7 +250,7 @@ class AntecedentesPersonalesAPIView(APIView):
 
 
 class ResponsableProfileAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [SoloPropioTutor]
 
     def get(self, request):
         try:
@@ -188,12 +265,12 @@ class ResponsableProfileAPIView(APIView):
 
     def put(self, request):
         persona = getattr(request.user, 'persona', None)
-            
+
         responsable, created = Responsables.objects.get_or_create(
             usuario=request.user,
             defaults={'persona': persona, 'parentesco': 'OTRO'}
         )
-        
+
         serializer = ResponsablesSerializer(responsable, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
