@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from django.db.models import Q
 
+from authentication.permissions import EsMedico, EsOdontologo
 from core.models import Personas
 from patients.models import Pacientes
 from patients.serializers import PacientesSerializer
@@ -16,9 +17,11 @@ from .serializers import (
 )
 from .services.services_refeps import RefepsService
 
+ROL_PROFESIONAL = EsMedico | EsOdontologo
+
 
 class ProfesionalPerfilAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ROL_PROFESIONAL]
 
     def get(self, request):
         user = request.user
@@ -74,7 +77,7 @@ class ProfesionalPerfilAPIView(APIView):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([ROL_PROFESIONAL])
 def validar_matricula(request):
     serializer = ValidarMatriculaSerializer(data=request.data)
     if serializer.is_valid():
@@ -84,7 +87,7 @@ def validar_matricula(request):
 
 
 class BuscarPacienteAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [ROL_PROFESIONAL]
 
     def get(self, request):
         dni = request.query_params.get('dni', '').strip()
