@@ -22,5 +22,6 @@ urlpatterns = [
     path('auth/', include('authentication.urls')),
     path('api/v1/',include('patients.urls')),
     path('docs/', include('apidocs.urls')),
+    path('api/v1/profesionales/', include('professionals.urls')),
 ]
 

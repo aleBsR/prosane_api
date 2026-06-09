@@ -71,3 +71,15 @@ def responsable_perfil(request):
 
 def responsable_perfil_put(request):
     return render(request, 'apidocs/responsable_perfil_put.html', {'active': 'responsable_perfil_put'})
+
+
+def profesionales_perfil(request):
+    return render(request, 'apidocs/profesionales_perfil.html', {'active': 'profesionales_perfil'})
+
+
+def profesionales_perfil_put(request):
+    return render(request, 'apidocs/profesionales_perfil_put.html', {'active': 'profesionales_perfil_put'})
+
+
+def profesionales_validar_matricula(request):
+    return render(request, 'apidocs/profesionales_validar_matricula.html', {'active': 'profesionales_validar_matricula'})

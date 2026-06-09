@@ -41,6 +41,11 @@
       <li class="nav-section">Responsable</li>
       <li><a href="{% url 'apidocs:responsable_perfil' %}" {% if active == 'responsable_perfil' %}class="active"{% endif %}><span class="method-tag get">GET</span>Ver Perfil</a></li>
       <li><a href="{% url 'apidocs:responsable_perfil_put' %}" {% if active == 'responsable_perfil_put' %}class="active"{% endif %}><span class="method-tag put">PUT</span>Actualizar Perfil</a></li>
+
+      <li class="nav-section">Profesionales</li>
+      <li><a href="{% url 'apidocs:profesionales_perfil' %}" {% if active == 'profesionales_perfil' %}class="active"{% endif %}><span class="method-tag get">GET</span>Perfil</a></li>
+      <li><a href="{% url 'apidocs:profesionales_perfil_put' %}" {% if active == 'profesionales_perfil_put' %}class="active"{% endif %}><span class="method-tag put">PUT</span>Actualizar Perfil</a></li>
+      <li><a href="{% url 'apidocs:profesionales_validar_matricula' %}" {% if active == 'profesionales_validar_matricula' %}class="active"{% endif %}><span class="method-tag post">POST</span>Validar Matrícula</a></li>
     </ul>
   </aside>
 

@@ -22,4 +22,7 @@ urlpatterns = [
     path('antecedentes/personales/put/', views.antecedentes_personales_put, name='antecedentes_personales_put'),
     path('responsable/perfil/', views.responsable_perfil, name='responsable_perfil'),
     path('responsable/perfil/put/', views.responsable_perfil_put, name='responsable_perfil_put'),
+    path('profesionales/perfil/', views.profesionales_perfil, name='profesionales_perfil'),
+    path('profesionales/perfil/put/', views.profesionales_perfil_put, name='profesionales_perfil_put'),
+    path('profesionales/validar-matricula/', views.profesionales_validar_matricula, name='profesionales_validar_matricula'),
 ]

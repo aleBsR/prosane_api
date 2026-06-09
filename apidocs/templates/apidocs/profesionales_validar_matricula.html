@@ -1,0 +1,62 @@
+{% extends "apidocs/base.html" %}
+{% block title %}POST /api/v1/profesionales/validar-matricula/ — PROSANE API{% endblock %}
+{% block content %}
+<h1>Validar matrícula profesional</h1>
+
+<div class="endpoint-card">
+  <div class="endpoint-header">
+    <span class="endpoint-method post">POST</span>
+    <span class="endpoint-url">/api/v1/profesionales/validar-matricula/</span>
+    <span class="endpoint-auth">Requiere: Autenticación</span>
+  </div>
+  <div class="endpoint-body">
+    <h4>Descripción</h4>
+    <p>Valida una matrícula profesional contra el sistema REFEPS. Útil para verificar la identidad de un profesional antes de registrarlo o para consultas administrativas.</p>
+
+    <h4>Request Body</h4>
+    <pre><code>{
+  "matricula": "541012497922"
+}</code></pre>
+
+    <h4>Response — <code style="color: var(--success);">200 OK</code></h4>
+    <pre><code>{
+  "nombre": "Estela Rosa",
+  "apellido": "Acevedo",
+  "dni": "12497922",
+  "sexo": "female",
+  "fecha_nacimiento": "1956-10-18",
+  "profesion": "Médico"
+}</code></pre>
+
+    <h4>Response — <code style="color: var(--danger);">400 Bad Request</code></h4>
+    <pre><code>{
+  "error": {
+    "matricula": ["Matrícula no válida o no encontrada"]
+  }
+}</code></pre>
+
+    <h4>Matrículas de prueba (modo mock)</h4>
+    <table>
+      <thead>
+        <tr><th>Matrícula</th><th>Profesión</th><th>Titular</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>541012497922</code></td><td>Médico</td><td>Estela Rosa Acevedo</td></tr>
+        <tr><td><code>123456789</code></td><td>Odontólogo</td><td>Carlos López</td></tr>
+      </tbody>
+    </table>
+
+    <div style="background: var(--bg-code); border: 1px solid var(--border); border-radius: 6px; padding: 16px; margin-top: 16px;">
+      <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+        <strong>Nota:</strong> Actualmente REFEPS opera en modo <strong>mock</strong> (<code>REFEPS_MOCK = True</code>). Solo las matrículas de prueba funcionan. Cuando se integre con REFEPS real, cualquier matrícula válida será aceptada.
+      </p>
+    </div>
+
+    <h4>Ejemplo con curl</h4>
+    <pre><code>curl -X POST http://localhost:8000/api/v1/profesionales/validar-matricula/ \
+  -H "Authorization: Bearer &lt;token&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"matricula": "541012497922"}'</code></pre>
+  </div>
+</div>
+{% endblock %}
