@@ -43,4 +43,5 @@ class ValidarMatriculaSerializer(serializers.Serializer):
         datos = RefepsService.consultar(value)
         if datos is None:
             raise serializers.ValidationError('Matrícula no válida o no encontrada')
+        self.context['datos_refeps'] = datos
         return value

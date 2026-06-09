@@ -9,8 +9,8 @@ from .views import (
 
 urlpatterns = [
     path('', PacienteListCreateAPIView.as_view(), name='paciente-list-create'),
-    path('<int:pk>/', PacienteDetailAPIView.as_view(), name='paciente-detail'),
-    path('<int:patient_id>/antecedentes-familiares/', AntecedentesFamiliaresAPIView.as_view(), name='antecedentes-familiares'),
-    path('<int:patient_id>/antecedentes-personales/', AntecedentesPersonalesAPIView.as_view(), name='antecedentes-personales'),
+    path('<uuid:pk>/', PacienteDetailAPIView.as_view(), name='paciente-detail'),
+    path('<uuid:patient_id>/antecedentes-familiares/', AntecedentesFamiliaresAPIView.as_view(), name='antecedentes-familiares'),
+    path('<uuid:patient_id>/antecedentes-personales/', AntecedentesPersonalesAPIView.as_view(), name='antecedentes-personales'),
     path('responsable/', ResponsableProfileAPIView.as_view(), name='responsable-profile'),
 ]

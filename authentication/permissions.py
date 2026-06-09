@@ -34,6 +34,13 @@ class EsTutor(TieneRol):
 class EsAyudante(TieneRol):
     nombre_rol = 'ayudante'
 
+class EsProfesional(IsAuthenticated):
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        roles = request.auth.get('roles', [])
+        return any(r['rol'] in ('medico', 'odontologo') for r in roles)
+
 class EsAdmin(IsAuthenticated):
     def has_permission(self, request, view):
         if not super().has_permission(request,view):
