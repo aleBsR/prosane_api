@@ -83,3 +83,7 @@ def profesionales_perfil_put(request):
 
 def profesionales_validar_matricula(request):
     return render(request, 'apidocs/profesionales_validar_matricula.html', {'active': 'profesionales_validar_matricula'})
+
+
+def profesionales_buscar_paciente(request):
+    return render(request, 'apidocs/profesionales_buscar_paciente.html', {'active': 'profesionales_buscar_paciente'})
