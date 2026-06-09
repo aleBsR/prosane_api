@@ -1,11 +1,10 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from django.db.models import Q
 
-from authentication.permissions import EsMedico, EsOdontologo
+from authentication.permissions import EsProfesional
 from core.models import Personas
 from patients.models import Pacientes
 from patients.serializers import PacientesSerializer
@@ -17,18 +16,13 @@ from .serializers import (
 )
 from .services.services_refeps import RefepsService
 
-ROL_PROFESIONAL = EsMedico | EsOdontologo
-
 
 class ProfesionalPerfilAPIView(APIView):
-    permission_classes = [ROL_PROFESIONAL]
+    permission_classes = [EsProfesional]
 
     def get(self, request):
-        user = request.user
-        persona = getattr(user, 'persona', None)
-
         try:
-            profesional = Profesionales.objects.get(id_usuario=user)
+            profesional = Profesionales.objects.get(id_usuario=request.user)
         except Profesionales.DoesNotExist:
             return Response(
                 {"detail": "No se encontró un perfil profesional para este usuario."},
@@ -36,8 +30,8 @@ class ProfesionalPerfilAPIView(APIView):
             )
 
         data = {
-            'email': user.email,
-            'persona': persona,
+            'email': request.user.email,
+            'persona': getattr(request.user, 'persona', None),
             'profesional': profesional,
         }
         serializer = ProfesionalPerfilSerializer(data)
@@ -77,7 +71,7 @@ class ProfesionalPerfilAPIView(APIView):
 
 
 @api_view(['POST'])
-@permission_classes([ROL_PROFESIONAL])
+@permission_classes([EsProfesional])
 def validar_matricula(request):
     serializer = ValidarMatriculaSerializer(data=request.data)
     if serializer.is_valid():
@@ -87,7 +81,7 @@ def validar_matricula(request):
 
 
 class BuscarPacienteAPIView(APIView):
-    permission_classes = [ROL_PROFESIONAL]
+    permission_classes = [EsProfesional]
 
     def get(self, request):
         dni = request.query_params.get('dni', '').strip()
