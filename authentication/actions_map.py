@@ -49,7 +49,11 @@ _FIRMAR_APTO = _a(
     is_sensitive=True, sort_order=40,
 )
 
-# --- Mapa rol → acciones (Fase 1; los nombres de rol salen de la tabla `roles`) ---
+# --- Mapa rol → acciones ---
+# ⚠️ FUENTE TEMPORAL — SOLO para el /me de Fase 1 (mapa en código).
+# La fuente CANÓNICA de la DB son los fixtures (authentication/fixtures/*.json),
+# que deben espejar este mapa hasta que Slice 2 haga que /me lea de la DB; ahí se
+# elimina ROLE_ACTIONS. No agregar nuevas fuentes de verdad.
 ROLE_ACTIONS = {
     "medico": [
         _LISTAR_PACIENTES,
@@ -113,25 +117,12 @@ def actions_for_roles(role_names):
 
 
 def all_actions():
-    """Lista de acciones únicas (por name) definidas en el mapa. Fuente del seed."""
+    """Catálogo completo de acciones únicas (por name). Lo usa el /me del superuser."""
     by_name = {}
     for acciones in ROLE_ACTIONS.values():
         for a in acciones:
             by_name[a["name"]] = a
     return list(by_name.values())
-
-
-def role_action_pairs():
-    """Pares (rol, name_de_accion) que el seed vuelca en role_actions."""
-    pares = []
-    seen = set()
-    for rol, acciones in ROLE_ACTIONS.items():
-        for a in acciones:
-            par = (rol, a["name"])
-            if par not in seen:
-                seen.add(par)
-                pares.append(par)
-    return pares
 
 
 def permissions_version(actions):

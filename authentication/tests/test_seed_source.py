@@ -9,7 +9,6 @@ from authentication.actions_map import (
     ROLE_ACTIONS,
     ACTION_FIELDS,
     all_actions,
-    role_action_pairs,
 )
 
 
@@ -31,22 +30,5 @@ class AllActionsTests(SimpleTestCase):
         crear = [a for a in all_actions() if a["name"] == "crearApto"]
         self.assertEqual(len(crear), 1)
 
-
-class RoleActionPairsTests(SimpleTestCase):
-    def test_pares_rol_accion(self):
-        pares = role_action_pairs()
-        self.assertIn(("medico", "crearApto"), pares)
-        self.assertIn(("tutor", "darConsentimiento"), pares)
-
-    def test_no_hay_pares_duplicados(self):
-        pares = role_action_pairs()
-        self.assertEqual(len(pares), len(set(pares)))
-
-    def test_toda_accion_referenciada_existe_en_all_actions(self):
-        nombres = {a["name"] for a in all_actions()}
-        for _rol, accion in role_action_pairs():
-            self.assertIn(accion, nombres)
-
-    def test_solo_roles_del_mapa(self):
-        roles = {rol for rol, _accion in role_action_pairs()}
-        self.assertEqual(roles, set(ROLE_ACTIONS.keys()))
+    def test_catalogo_tiene_8(self):
+        self.assertEqual(len(all_actions()), 8)
