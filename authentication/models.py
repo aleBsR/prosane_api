@@ -64,9 +64,16 @@ class Usuarios(AbstractBaseUser, PermissionsMixin):
         db_table = 'usuarios'
 
 
-class UserRole(BaseModel):
+class UserRole(models.Model):
+    # Reconciliación de schema (#12): la tabla real `user_role` NO tiene las columnas
+    # de auditoría de BaseModel — solo id (integer), id_rol, id_user, created_at,
+    # updated_at. El modelo refleja exactamente eso (no hereda BaseModel) para que
+    # los writes por ORM (seed_users, register, asignar_rol) funcionen.
+    id = models.AutoField(primary_key=True)
     id_rol = models.ForeignKey(Roles, models.DO_NOTHING, db_column='id_rol')
     id_user = models.ForeignKey(Usuarios, models.DO_NOTHING, db_column='id_user')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False
