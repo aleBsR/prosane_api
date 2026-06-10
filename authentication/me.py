@@ -1,14 +1,13 @@
-"""Armador del payload de `GET /api/v1/auth/me` (contrato congelado, spec §3).
+"""Formateador del payload de `GET /api/v1/auth/me` (contrato congelado, spec §3).
 
-Puro: recibe el usuario, los nombres de rol y `now`; devuelve el dict del contrato.
-La vista (views.py) sólo extrae los roles del token y delega acá. En Fase 2 cambia
-de dónde salen las acciones, NO la forma de este payload.
+PURO: recibe el usuario, los nombres de rol y las acciones YA RESUELTAS, y arma el
+dict del contrato. La resolución de acciones (mapa de código en Fase 1 / tablas en
+Slice 2) vive afuera; así el contrato es idéntico independientemente de la fuente,
+y el test de equivalencia puede comparar ambas resoluciones con el mismo formateador.
 """
 from datetime import timezone
 
-from authentication.actions_map import (
-    actions_for_roles, all_actions, permissions_version, role_label,
-)
+from authentication.actions_map import permissions_version, role_label
 
 
 def _iso_z(dt):
@@ -16,14 +15,7 @@ def _iso_z(dt):
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def build_me_payload(user, role_names, *, now):
-    # El superuser ve el catálogo completo (para que el menú no salga vacío). El
-    # bypass de superuser de Django (has_perm=true) NO infla la lista del /me, así
-    # que lo resolvemos acá explícitamente. Contract-preserving: misma forma, set "todas".
-    if getattr(user, "is_superuser", False):
-        actions = sorted(all_actions(), key=lambda a: (a["sort_order"], a["name"]))
-    else:
-        actions = actions_for_roles(role_names)
+def build_me_payload(user, role_names, actions, *, now):
     persona = getattr(user, "persona", None)
     return {
         "user": {

@@ -50,6 +50,13 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = 'authentication.Usuarios'
 
+# Permisos: ModelBackend (login admin + short-circuit de superuser) + el backend
+# data-driven por acción (resuelve has_perm('crearApto') desde la DB; spec §6).
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'authentication.action_resolution.ActionPermissionBackend',
+]
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

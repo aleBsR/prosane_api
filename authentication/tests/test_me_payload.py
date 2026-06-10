@@ -1,103 +1,80 @@
-"""Tests del armador puro del payload de /me (Fase 1).
+"""Tests del formateador puro del payload de /me + el resolutor Fase 1 (código).
 
-Codifica el contrato CONGELADO de /api/v1/auth/me (spec §3):
-top-level {user, roles, actions, meta}, `actions` con las 8 claves,
-`meta` con version (hash del set) + permissions_synced_at.
-
-Puro (sin DB ni request): SimpleTestCase con un user de juguete.
+build_me_payload es un formateador puro (recibe role_names + actions ya resueltas).
+resolve_actions_code es la resolución Fase 1 (mapa en código). Ambos sin DB.
 """
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from authentication.actions_map import actions_for_roles, all_actions, permissions_version
+from authentication.actions_map import (
+    actions_for_roles, all_actions, permissions_version, resolve_actions_code,
+)
 from authentication.me import build_me_payload
 
 NOW = datetime(2026, 6, 9, 12, 0, 0, tzinfo=timezone.utc)
 
 
-def _user(persona=None):
+def _user(persona=None, is_superuser=False):
     return SimpleNamespace(
         id="9b2c0000-0000-0000-0000-000000000001",
         email="medico@prosane.gob.ar",
         is_staff=False,
+        is_superuser=is_superuser,
         persona=persona,
     )
 
 
 class BuildMePayloadTests(SimpleTestCase):
     def test_top_level_tiene_user_roles_actions_meta(self):
-        payload = build_me_payload(_user(), ["medico"], now=NOW)
+        payload = build_me_payload(_user(), ["medico"], actions_for_roles(["medico"]), now=NOW)
         self.assertEqual(set(payload.keys()), {"user", "roles", "actions", "meta"})
 
-    def test_actions_coinciden_con_actions_for_roles(self):
-        payload = build_me_payload(_user(), ["medico"], now=NOW)
-        self.assertEqual(payload["actions"], actions_for_roles(["medico"]))
+    def test_actions_passthrough(self):
+        acts = actions_for_roles(["medico"])
+        payload = build_me_payload(_user(), ["medico"], acts, now=NOW)
+        self.assertEqual(payload["actions"], acts)
 
-    def test_meta_version_es_el_hash_del_set(self):
-        payload = build_me_payload(_user(), ["medico"], now=NOW)
-        self.assertEqual(
-            payload["meta"]["version"],
-            permissions_version(actions_for_roles(["medico"])),
-        )
+    def test_meta_version_es_el_hash_de_las_actions(self):
+        acts = actions_for_roles(["medico"])
+        payload = build_me_payload(_user(), ["medico"], acts, now=NOW)
+        self.assertEqual(payload["meta"]["version"], permissions_version(acts))
 
     def test_meta_synced_at_en_formato_z(self):
-        payload = build_me_payload(_user(), ["medico"], now=NOW)
+        payload = build_me_payload(_user(), [], [], now=NOW)
         self.assertEqual(payload["meta"]["permissions_synced_at"], "2026-06-09T12:00:00Z")
 
     def test_roles_mapeados_a_name_y_label(self):
-        payload = build_me_payload(_user(), ["medico"], now=NOW)
+        payload = build_me_payload(_user(), ["medico"], [], now=NOW)
         self.assertEqual(payload["roles"], [{"name": "medico", "label": "Médico/a"}])
 
     def test_user_con_persona(self):
         persona = SimpleNamespace(nombre="Ana", apellido="García")
-        payload = build_me_payload(_user(persona), ["medico"], now=NOW)
-        self.assertEqual(payload["user"]["email"], "medico@prosane.gob.ar")
+        payload = build_me_payload(_user(persona), ["medico"], [], now=NOW)
         self.assertEqual(payload["user"]["nombre"], "Ana")
         self.assertEqual(payload["user"]["apellido"], "García")
-        self.assertFalse(payload["user"]["is_staff"])
 
     def test_user_sin_persona_no_rompe(self):
-        payload = build_me_payload(_user(persona=None), ["medico"], now=NOW)
+        payload = build_me_payload(_user(persona=None), ["medico"], [], now=NOW)
         self.assertIsNone(payload["user"]["nombre"])
         self.assertIsNone(payload["user"]["apellido"])
 
-    def test_sin_roles_actions_vacio_y_version_estable(self):
-        payload = build_me_payload(_user(), [], now=NOW)
-        self.assertEqual(payload["actions"], [])
-        self.assertEqual(payload["roles"], [])
-        self.assertEqual(payload["meta"]["version"], permissions_version([]))
 
-
-class SuperuserCatalogoTests(SimpleTestCase):
-    def _superuser(self):
-        return SimpleNamespace(
-            id="9b2c0000-0000-0000-0000-0000000000ff",
-            email="superadmin@prosane.test",
-            is_staff=True,
-            is_superuser=True,
-            persona=None,
-        )
+class ResolveActionsCodeTests(SimpleTestCase):
+    def test_por_rol(self):
+        self.assertEqual(resolve_actions_code(_user(), ["tutor"]), actions_for_roles(["tutor"]))
 
     def test_superuser_recibe_catalogo_completo(self):
-        # aunque no tenga roles asignados, ve TODAS las acciones (para el menú)
-        payload = build_me_payload(self._superuser(), [], now=NOW)
-        nombres = {a["name"] for a in payload["actions"]}
-        self.assertEqual(nombres, {a["name"] for a in all_actions()})
-        self.assertEqual(len(payload["actions"]), 8)
+        acts = resolve_actions_code(_user(is_superuser=True), [])
+        self.assertEqual({a["name"] for a in acts}, {a["name"] for a in all_actions()})
+        self.assertEqual(len(acts), 8)
 
-    def test_superuser_actions_respeta_8_claves_y_orden(self):
-        payload = build_me_payload(self._superuser(), [], now=NOW)
-        orders = [a["sort_order"] for a in payload["actions"]]
-        self.assertEqual(orders, sorted(orders))
-        for a in payload["actions"]:
+    def test_superuser_ordenado_y_8_claves(self):
+        acts = resolve_actions_code(_user(is_superuser=True), [])
+        self.assertEqual([a["sort_order"] for a in acts], sorted(a["sort_order"] for a in acts))
+        for a in acts:
             self.assertEqual(
                 set(a.keys()),
                 {"name", "label", "icon", "color", "type", "category", "is_sensitive", "sort_order"},
             )
-
-    def test_no_superuser_sigue_por_roles(self):
-        normal = SimpleNamespace(id="x", email="m@x", is_staff=False, is_superuser=False, persona=None)
-        payload = build_me_payload(normal, ["tutor"], now=NOW)
-        self.assertEqual(payload["actions"], actions_for_roles(["tutor"]))

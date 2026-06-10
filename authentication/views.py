@@ -8,6 +8,7 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.permissions import AllowAny
 
 from authentication.me import build_me_payload
+from authentication.action_resolution import effective_actions
 
 from authentication.models import Roles, Usuarios
 from authentication.serializers import (
@@ -99,11 +100,11 @@ def solo_medicos(request):
 def me(request):
     """Sesión del usuario autenticado: datos + roles + acciones (contrato congelado).
 
-    Fase 1: las acciones se derivan de los roles que viajan en el claim `roles` del
-    token (emitido por getCustomToken). En Fase 2 saldrán de la DB sin cambiar la forma
-    de la respuesta. Usa el permiso default (IsAuthenticated).
+    Slice 2: roles y acciones salen de la DB (effective_actions, resolución computada).
+    El contrato es byte-por-byte idéntico al de Fase 1 (test de equivalencia lo blinda).
+    Usa el permiso default (IsAuthenticated).
     """
-    roles_claim = request.auth.get('roles', []) if request.auth else []
-    role_names = [r.get('rol') for r in roles_claim if isinstance(r, dict) and r.get('rol')]
-    payload = build_me_payload(request.user, role_names, now=timezone.now())
+    user = request.user
+    role_names = list(user.roles.values_list('rol', flat=True))
+    payload = build_me_payload(user, role_names, effective_actions(user), now=timezone.now())
     return Response(payload)

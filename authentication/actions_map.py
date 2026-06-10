@@ -125,6 +125,17 @@ def all_actions():
     return list(by_name.values())
 
 
+def resolve_actions_code(user, role_names):
+    """Resolución de acciones Fase 1 (mapa en código). Superuser → catálogo completo.
+
+    Sirve de referencia para el test de equivalencia con la resolución desde la DB
+    (Slice 2). Se elimina cuando se retire ROLE_ACTIONS.
+    """
+    if getattr(user, "is_superuser", False):
+        return sorted(all_actions(), key=lambda a: (a["sort_order"], a["name"]))
+    return actions_for_roles(role_names)
+
+
 def permissions_version(actions):
     """Hash corto y determinístico del conjunto de `name` (independiente del orden).
 
