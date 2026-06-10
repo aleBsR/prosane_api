@@ -1,0 +1,7 @@
+[
+  { "model": "authentication.roles", "pk": 1, "fields": { "rol": "usuario", "ruta": "/home", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roles", "pk": 2, "fields": { "rol": "medico", "ruta": "/home/medico", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roles", "pk": 3, "fields": { "rol": "odontologo", "ruta": "/home/odontologo", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roles", "pk": 4, "fields": { "rol": "tutor", "ruta": "/home/tutor", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roles", "pk": 5, "fields": { "rol": "ayudante", "ruta": "/home/ayudante", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } }
+]

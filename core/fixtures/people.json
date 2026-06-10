@@ -1,0 +1,7 @@
+[
+  { "model": "core.personas", "pk": 9001, "fields": { "nombre": "Super", "apellido": "Admin", "dni": "90000001", "tipo_dni": "DNI", "sexo": "X", "fecha_nacimiento": "1985-01-01" } },
+  { "model": "core.personas", "pk": 9002, "fields": { "nombre": "Mariana", "apellido": "Médica", "dni": "90000002", "tipo_dni": "DNI", "sexo": "F", "fecha_nacimiento": "1988-03-12" } },
+  { "model": "core.personas", "pk": 9003, "fields": { "nombre": "Oscar", "apellido": "Odontólogo", "dni": "90000003", "tipo_dni": "DNI", "sexo": "M", "fecha_nacimiento": "1986-07-04" } },
+  { "model": "core.personas", "pk": 9004, "fields": { "nombre": "Ana", "apellido": "Ayudante", "dni": "90000004", "tipo_dni": "DNI", "sexo": "F", "fecha_nacimiento": "1995-11-20" } },
+  { "model": "core.personas", "pk": 9005, "fields": { "nombre": "Tomás", "apellido": "Tutor", "dni": "90000005", "tipo_dni": "DNI", "sexo": "M", "fecha_nacimiento": "1980-05-30" } }
+]

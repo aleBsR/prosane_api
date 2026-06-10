@@ -1,0 +1,18 @@
+[
+  { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000001",
+    "fields": { "name": "listarPacientes", "label": "Listar pacientes", "icon": "people", "color": "#1565C0", "type": "list", "category": "salud", "is_sensitive": false, "sort_order": 10, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000002",
+    "fields": { "name": "verConstancias", "label": "Ver constancias", "icon": "description", "color": "#455A64", "type": "list", "category": "consentimiento", "is_sensitive": false, "sort_order": 10, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000003",
+    "fields": { "name": "registrarAntropometria", "label": "Registrar antropometría", "icon": "straighten", "color": "#EF6C00", "type": "form", "category": "salud", "is_sensitive": true, "sort_order": 15, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000004",
+    "fields": { "name": "darConsentimiento", "label": "Dar consentimiento", "icon": "how_to_reg", "color": "#455A64", "type": "form", "category": "consentimiento", "is_sensitive": true, "sort_order": 20, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000005",
+    "fields": { "name": "verFichaClinica", "label": "Ver ficha clínica", "icon": "clinical_notes", "color": "#6A1B9A", "type": "form", "category": "salud", "is_sensitive": true, "sort_order": 20, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000006",
+    "fields": { "name": "verFichaOdontologica", "label": "Ver ficha odontológica", "icon": "dentistry", "color": "#00838F", "type": "form", "category": "salud", "is_sensitive": true, "sort_order": 25, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000007",
+    "fields": { "name": "crearApto", "label": "Crear apto físico", "icon": "assignment_add", "color": "#2E7D32", "type": "form", "category": "salud", "is_sensitive": true, "sort_order": 30, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000008",
+    "fields": { "name": "firmarApto", "label": "Firmar apto físico", "icon": "draw", "color": "#2E7D32", "type": "form", "category": "salud", "is_sensitive": true, "sort_order": 40, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } }
+]

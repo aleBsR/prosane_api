@@ -1,0 +1,17 @@
+[
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000001", "fields": { "role": 2, "action": "a0000000-0000-0000-0000-000000000001", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000002", "fields": { "role": 2, "action": "a0000000-0000-0000-0000-000000000005", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000003", "fields": { "role": 2, "action": "a0000000-0000-0000-0000-000000000007", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000004", "fields": { "role": 2, "action": "a0000000-0000-0000-0000-000000000008", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000005", "fields": { "role": 3, "action": "a0000000-0000-0000-0000-000000000001", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000006", "fields": { "role": 3, "action": "a0000000-0000-0000-0000-000000000006", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000007", "fields": { "role": 3, "action": "a0000000-0000-0000-0000-000000000007", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000008", "fields": { "role": 3, "action": "a0000000-0000-0000-0000-000000000008", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000009", "fields": { "role": 5, "action": "a0000000-0000-0000-0000-000000000001", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000010", "fields": { "role": 5, "action": "a0000000-0000-0000-0000-000000000003", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000011", "fields": { "role": 4, "action": "a0000000-0000-0000-0000-000000000002", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.roleaction", "pk": "b0000000-0000-0000-0000-000000000012", "fields": { "role": 4, "action": "a0000000-0000-0000-0000-000000000004", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } }
+]
