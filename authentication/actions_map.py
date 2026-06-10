@@ -112,6 +112,28 @@ def actions_for_roles(role_names):
     return sorted(by_name.values(), key=lambda a: (a["sort_order"], a["name"]))
 
 
+def all_actions():
+    """Lista de acciones únicas (por name) definidas en el mapa. Fuente del seed."""
+    by_name = {}
+    for acciones in ROLE_ACTIONS.values():
+        for a in acciones:
+            by_name[a["name"]] = a
+    return list(by_name.values())
+
+
+def role_action_pairs():
+    """Pares (rol, name_de_accion) que el seed vuelca en role_actions."""
+    pares = []
+    seen = set()
+    for rol, acciones in ROLE_ACTIONS.items():
+        for a in acciones:
+            par = (rol, a["name"])
+            if par not in seen:
+                seen.add(par)
+                pares.append(par)
+    return pares
+
+
 def permissions_version(actions):
     """Hash corto y determinístico del conjunto de `name` (independiente del orden).
 
