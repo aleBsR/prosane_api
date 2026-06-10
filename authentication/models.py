@@ -5,6 +5,12 @@ from common.models import BaseModel
 
 
 class Roles(BaseModel):
+    # La tabla real `roles` usa id INTEGER (igual que personas/user_role), no el
+    # UUID que trae BaseModel. Override para que el modelo matchee la realidad y
+    # los FKs a roles (p. ej. role_actions, user_role) resuelvan bien.
+    # NOTA: mismo desfasaje pendiente en personas/user_role/pacientes (ver tarea de
+    # reconciliación de schema).
+    id = models.AutoField(primary_key=True)
     rol = models.CharField(max_length=50, blank=True, null=True)
     ruta = models.CharField(max_length=100, blank=True, null=True)
 
