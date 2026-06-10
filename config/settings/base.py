@@ -135,6 +135,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 from datetime import timedelta
 
 
+# Test runner: crea las tablas managed=False en el test DB (ver config/test_runner.py)
+TEST_RUNNER = 'config.test_runner.ManagedModelTestRunner'
+
 REST_FRAMEWORK = {
 
     # Esto asegura que JWTAuthentication se utilice como el método de autenticación 

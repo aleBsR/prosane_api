@@ -49,8 +49,13 @@ class AuditModelTestCase(TransactionTestCase):
 
         cls.AuditExample = AuditExample
 
+        # El test runner (config.test_runner) ya crea las tablas managed=False,
+        # incluida `personas`. Solo la creamos acá si no está (compatibilidad).
+        existing = set(connection.introspection.table_names())
+        cls._created_personas = Personas._meta.db_table not in existing
         with connection.schema_editor() as schema_editor:
-            schema_editor.create_model(Personas)
+            if cls._created_personas:
+                schema_editor.create_model(Personas)
             schema_editor.create_model(AuditExample)
 
         cls.addClassCleanup(cls._drop_tables)
@@ -59,7 +64,8 @@ class AuditModelTestCase(TransactionTestCase):
     def _drop_tables(cls):
         with connection.schema_editor() as schema_editor:
             schema_editor.delete_model(cls.AuditExample)
-            schema_editor.delete_model(Personas)
+            if getattr(cls, "_created_personas", False):
+                schema_editor.delete_model(Personas)
 
     def tearDown(self):
         # Limpiamos las filas efímeras: TransactionTestCase solo vacía modelos
