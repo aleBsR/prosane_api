@@ -6,7 +6,9 @@ de dónde salen las acciones, NO la forma de este payload.
 """
 from datetime import timezone
 
-from authentication.actions_map import actions_for_roles, permissions_version, role_label
+from authentication.actions_map import (
+    actions_for_roles, all_actions, permissions_version, role_label,
+)
 
 
 def _iso_z(dt):
@@ -15,7 +17,13 @@ def _iso_z(dt):
 
 
 def build_me_payload(user, role_names, *, now):
-    actions = actions_for_roles(role_names)
+    # El superuser ve el catálogo completo (para que el menú no salga vacío). El
+    # bypass de superuser de Django (has_perm=true) NO infla la lista del /me, así
+    # que lo resolvemos acá explícitamente. Contract-preserving: misma forma, set "todas".
+    if getattr(user, "is_superuser", False):
+        actions = sorted(all_actions(), key=lambda a: (a["sort_order"], a["name"]))
+    else:
+        actions = actions_for_roles(role_names)
     persona = getattr(user, "persona", None)
     return {
         "user": {

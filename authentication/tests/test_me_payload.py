@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from authentication.actions_map import actions_for_roles, permissions_version
+from authentication.actions_map import actions_for_roles, all_actions, permissions_version
 from authentication.me import build_me_payload
 
 NOW = datetime(2026, 6, 9, 12, 0, 0, tzinfo=timezone.utc)
@@ -68,3 +68,36 @@ class BuildMePayloadTests(SimpleTestCase):
         self.assertEqual(payload["actions"], [])
         self.assertEqual(payload["roles"], [])
         self.assertEqual(payload["meta"]["version"], permissions_version([]))
+
+
+class SuperuserCatalogoTests(SimpleTestCase):
+    def _superuser(self):
+        return SimpleNamespace(
+            id="9b2c0000-0000-0000-0000-0000000000ff",
+            email="superadmin@prosane.test",
+            is_staff=True,
+            is_superuser=True,
+            persona=None,
+        )
+
+    def test_superuser_recibe_catalogo_completo(self):
+        # aunque no tenga roles asignados, ve TODAS las acciones (para el menú)
+        payload = build_me_payload(self._superuser(), [], now=NOW)
+        nombres = {a["name"] for a in payload["actions"]}
+        self.assertEqual(nombres, {a["name"] for a in all_actions()})
+        self.assertEqual(len(payload["actions"]), 8)
+
+    def test_superuser_actions_respeta_8_claves_y_orden(self):
+        payload = build_me_payload(self._superuser(), [], now=NOW)
+        orders = [a["sort_order"] for a in payload["actions"]]
+        self.assertEqual(orders, sorted(orders))
+        for a in payload["actions"]:
+            self.assertEqual(
+                set(a.keys()),
+                {"name", "label", "icon", "color", "type", "category", "is_sensitive", "sort_order"},
+            )
+
+    def test_no_superuser_sigue_por_roles(self):
+        normal = SimpleNamespace(id="x", email="m@x", is_staff=False, is_superuser=False, persona=None)
+        payload = build_me_payload(normal, ["tutor"], now=NOW)
+        self.assertEqual(payload["actions"], actions_for_roles(["tutor"]))
