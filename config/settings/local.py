@@ -14,6 +14,11 @@ DEBUG = True
 # En desarrollo permitimos todos los hosts por comodidad
 ALLOWED_HOSTS = ['*']
 
+# Habilita los seeds de datos de prueba (usuarios con password conocida, etc.).
+# SOLO acá (local) — jamás en base.py ni production.py. Es la salvaguarda anti-prod:
+# los commands de seed de usuarios abortan si esto no está en True.
+SEEDS_ENABLED = True
+
 # Configuración de base de datos PostgreSQL local
 DATABASES = {
     'default': {
