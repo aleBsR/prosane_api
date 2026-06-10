@@ -66,3 +66,69 @@ class UserRole(BaseModel):
         managed = False
         db_table = 'user_role'
         unique_together = (('id_rol', 'id_user'),)
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# Permisos data-driven — Fase 2 (tablas propias, managed=True)
+# Spec: docs/superpowers/specs/2026-06-09-permisos-data-driven-design.md §4
+# A diferencia de las tablas de inspectdb (managed=False), estas 4 son nuevas y
+# propias de esta feature → Django es dueño de su esquema (migraciones reales).
+# ───────────────────────────────────────────────────────────────────────────
+
+class Action(BaseModel):
+    """Unidad de permiso + metadata visual liviana (contrato congelado del /me)."""
+    name = models.CharField(max_length=64, unique=True)   # camelCase, clave de permiso
+    label = models.CharField(max_length=191)
+    icon = models.CharField(max_length=64, blank=True, null=True)
+    color = models.CharField(max_length=9, blank=True, null=True)   # hex
+    type = models.CharField(max_length=32)                # form | list | map
+    category = models.CharField(max_length=32, blank=True, null=True)  # salud | administrativo | …
+    is_sensitive = models.BooleanField(default=False)
+    sort_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        managed = True
+        db_table = 'actions'
+
+    def __str__(self):
+        return self.name
+
+
+class RoleAction(BaseModel):
+    """Acciones que otorga un rol por defecto (base del cálculo de permisos)."""
+    role = models.ForeignKey(Roles, on_delete=models.CASCADE, db_column='role_id', related_name='role_actions')
+    action = models.ForeignKey(Action, on_delete=models.CASCADE, db_column='action_id', related_name='role_actions')
+
+    class Meta:
+        managed = True
+        db_table = 'role_actions'
+        unique_together = (('role', 'action'),)
+
+
+class UserActionOverride(BaseModel):
+    """Excepción manual: suma ('grant') o resta ('deny') una acción a un usuario."""
+    GRANT = 'grant'
+    DENY = 'deny'
+    EFFECT_CHOICES = ((GRANT, 'grant'), (DENY, 'deny'))
+
+    user = models.ForeignKey(Usuarios, on_delete=models.CASCADE, db_column='user_id', related_name='action_overrides')
+    action = models.ForeignKey(Action, on_delete=models.CASCADE, db_column='action_id', related_name='overrides')
+    effect = models.CharField(max_length=8, choices=EFFECT_CHOICES)
+
+    class Meta:
+        managed = True
+        db_table = 'user_action_overrides'
+        unique_together = (('user', 'action'),)
+
+
+class ActionLog(BaseModel):
+    """Auditoría de uso de acciones sensibles. action_name es snapshot (no FK)."""
+    user = models.ForeignKey(Usuarios, on_delete=models.SET_NULL, null=True, blank=True, db_column='user_id', related_name='action_logs')
+    action_name = models.CharField(max_length=64)   # snapshot estable
+    used_at = models.DateTimeField(db_index=True)
+    context = models.JSONField(null=True, blank=True)   # sin DNI/diagnósticos en texto plano
+
+    class Meta:
+        managed = True
+        db_table = 'action_logs'
