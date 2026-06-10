@@ -22,6 +22,14 @@ venv.bak/
 .der
 .opencode
 
+# Binarios / dumps / capturas (no versionar)
+*.dump
+*.sql
+*.png
+*.jpg
+*.jpeg
+.DS_Store
+
 TODO_pacientes.md
 AGENTS.md
 
