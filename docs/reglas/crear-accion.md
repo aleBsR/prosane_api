@@ -66,6 +66,18 @@ Una fila por (rol, acción). El `role` es el **pk integer** del rol; el `action`
 **pks de rol:** `usuario=1, medico=2, odontologo=3, tutor=4, ayudante=5`.
 (El **superadmin** ve **todas** las acciones automáticamente; no hace falta vincularlo.)
 
+### 2.3 ⚠️ Espejar en `authentication/actions_map.py` (mientras `ROLE_ACTIONS` exista)
+`ROLE_ACTIONS` es el **mapa de Fase 1** que el test de equivalencia
+(`test_me_identico_byte_por_byte`) compara contra la DB. **Hasta que se retire**, agregá
+la MISMA acción ahí, con las mismas 8 claves y a los mismos roles del fixture, o la suite
+se rompe (el `/me` por DB y el mapa de código divergen):
+
+```python
+_VER_APTO = _a("verApto", "Ver apto físico", icon="fact_check", color="#2E7D32",
+               type="list", category="salud", is_sensitive=True, sort_order=45)
+# y sumarla a ROLE_ACTIONS["medico"], ROLE_ACTIONS["odontologo"] (los mismos roles del fixture)
+```
+
 ---
 
 ## 3. Cargar a la DB
