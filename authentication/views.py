@@ -17,6 +17,7 @@ from authentication.serializers import (
 )
 
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 
 from .permissions import EsMedico, EsAdmin
 
@@ -108,3 +109,25 @@ def me(request):
     role_names = list(user.roles.values_list('rol', flat=True))
     payload = build_me_payload(user, role_names, effective_actions(user), now=timezone.now())
     return Response(payload)
+
+
+@api_view(['POST'])
+def logout(request):
+    """Cierra sesión server-side: blacklistea el refresh token.
+
+    El front manda el `refresh` que quiere invalidar; queda en blacklist y no se puede
+    usar más para refrescar. (El access token es de vida corta y expira solo.)
+    Requiere autenticación (permiso default IsAuthenticated).
+    """
+    refresh = request.data.get('refresh')
+    if not refresh:
+        return Response(
+            {'detail': 'Falta el refresh token.'}, status=status.HTTP_400_BAD_REQUEST
+        )
+    try:
+        RefreshToken(refresh).blacklist()
+    except TokenError:
+        return Response(
+            {'detail': 'Token inválido o expirado.'}, status=status.HTTP_400_BAD_REQUEST
+        )
+    return Response(status=status.HTTP_205_RESET_CONTENT)
