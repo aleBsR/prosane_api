@@ -67,3 +67,28 @@ class Antecedentespersonales(BaseModel):
     class Meta:
         managed = False
         db_table = 'antecedentespersonales'
+
+
+class Consentimiento(BaseModel):
+    """Consentimiento de la familia (Ley 26.529). Un paso: crear = consentir; inmutable."""
+    ADULTO_RESPONSABLE = 'adulto_responsable'
+    NNA_MAYOR_13 = 'nna_mayor_13'
+    FIRMA_TIPO_CHOICES = (
+        (ADULTO_RESPONSABLE, 'Adulto responsable'),
+        (NNA_MAYOR_13, 'NNA mayor de 13'),
+    )
+
+    paciente = models.ForeignKey('patients.Pacientes', models.PROTECT, related_name='consentimientos')
+    firma_tipo = models.CharField(max_length=20, choices=FIRMA_TIPO_CHOICES)
+
+    adulto_nombre = models.CharField(max_length=200)
+    adulto_apellido = models.CharField(max_length=200)
+    adulto_tipo_documento = models.CharField(max_length=20)
+    adulto_dni = models.CharField(max_length=15)
+
+    firma_hash = models.CharField(max_length=128)
+    fecha_firma = models.DateTimeField()
+
+    class Meta:
+        managed = True
+        db_table = 'consentimientos'
