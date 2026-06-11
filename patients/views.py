@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+
+from authentication.permissions import require_action
 from django.db import transaction
 
 from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales
@@ -14,7 +16,7 @@ from .serializers import (
 )
 
 class PacienteListCreateAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [require_action('listarPacientes')]
 
     def get(self, request):
         persona = getattr(request.user, 'persona', None)
@@ -53,7 +55,7 @@ class PacienteListCreateAPIView(APIView):
 
 
 class PacienteDetailAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [require_action('listarPacientes')]
 
     def get_object(self, pk):
         return get_object_or_404(Pacientes, pk=pk)
@@ -86,7 +88,7 @@ class PacienteDetailAPIView(APIView):
 
 
 class AntecedentesFamiliaresAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [require_action('verFichaClinica')]
 
     def get(self, request, patient_id):
         paciente = get_object_or_404(Pacientes, pk=patient_id)
@@ -116,7 +118,7 @@ class AntecedentesFamiliaresAPIView(APIView):
 
 
 class AntecedentesPersonalesAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [require_action('verFichaClinica')]
 
     def get(self, request, patient_id):
         paciente = get_object_or_404(Pacientes, pk=patient_id)
