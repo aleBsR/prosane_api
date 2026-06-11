@@ -1,8 +1,9 @@
 from django.db import models
-from common.models import BaseModel
 
 
-class Domicilio(BaseModel):
+class Domicilio(models.Model):
+    # Reconciliación #12: tabla integer sin auditoría (no BaseModel).
+    id = models.AutoField(primary_key=True)
     calle = models.CharField(max_length=100, blank=True, null=True)
     nro_calle = models.CharField(max_length=10, blank=True, null=True)
     piso = models.CharField(max_length=10, blank=True, null=True)

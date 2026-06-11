@@ -2,7 +2,9 @@ from django.db import models
 from common.models import BaseModel
 
 
-class Responsables(BaseModel):
+class Responsables(models.Model):
+    # Reconciliación #12: integer id, sin auditoría.
+    id = models.AutoField(primary_key=True)
     parentesco = models.CharField(max_length=50)
     persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona', null=True, blank=True)
     usuario = models.ForeignKey('authentication.Usuarios', models.DO_NOTHING, db_column='usuario', null=True, blank=True)
@@ -12,7 +14,9 @@ class Responsables(BaseModel):
         db_table = 'responsables'
 
 
-class Pacientes(BaseModel):
+class Pacientes(models.Model):
+    # Reconciliación #12: integer id, sin auditoría.
+    id = models.AutoField(primary_key=True)
     domicilio = models.ForeignKey('core.Domicilio', models.DO_NOTHING, db_column='id_domicilio')
     responsable = models.ForeignKey(Responsables, models.DO_NOTHING, db_column='id_responsable', null=True)
     persona = models.ForeignKey('core.Personas', models.DO_NOTHING, db_column='id_persona')
