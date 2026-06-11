@@ -1,12 +1,18 @@
-"""Logging verboso de requests/responses para DESARROLLO.
+"""Logging verboso y LEGIBLE de requests/responses para DESARROLLO.
 
 Se activa SOLO desde config/settings/local.py (nunca base/production). Loguea
 método, path, status, duración y los bodies JSON de request/response **con los
 campos sensibles redactados** (Ley 25.326: nada de DNI/diagnósticos/emails/tokens
 en texto plano). No loguea headers (así el Bearer token nunca aparece).
+
+DX: colores ANSI (verbo + status según 2xx/4xx/5xx), JSON indentado y espaciado
+entre requests. Los colores solo se emiten en una consola real (TTY) o si se fuerza
+con PROSANE_LOG_COLOR=1; al redirigir a un archivo, salida limpia sin ANSI.
 """
 import json
 import logging
+import os
+import sys
 import time
 
 logger = logging.getLogger("prosane.api")
@@ -21,6 +27,34 @@ SENSITIVE_SUBSTRINGS = (
 REDACTED = "***"
 _MAX_BODY = 4000  # no logueamos bodies enormes
 
+# --- ANSI ---
+_RESET, _BOLD, _DIM = "\033[0m", "\033[1m", "\033[2m"
+_RED, _GREEN, _YELLOW, _BLUE, _MAGENTA, _CYAN = (
+    "\033[31m", "\033[32m", "\033[33m", "\033[34m", "\033[35m", "\033[36m",
+)
+_VERB_COLORS = {
+    "GET": _CYAN, "POST": _GREEN, "PUT": _YELLOW, "PATCH": _YELLOW,
+    "DELETE": _RED, "OPTIONS": _DIM, "HEAD": _DIM,
+}
+
+
+def _color_on():
+    return sys.stderr.isatty() or os.environ.get("PROSANE_LOG_COLOR") == "1"
+
+
+def _c(color, text):
+    return f"{color}{text}{_RESET}" if _color_on() else str(text)
+
+
+def _status_color(code):
+    if 200 <= code < 300:
+        return _GREEN
+    if 300 <= code < 400:
+        return _CYAN
+    if 400 <= code < 500:
+        return _YELLOW
+    return _RED
+
 
 def _is_sensitive(key):
     k = str(key).lower()
@@ -28,10 +62,7 @@ def _is_sensitive(key):
 
 
 def redact(value):
-    """Devuelve una copia con los valores de claves sensibles reemplazados por ***.
-
-    Recursivo sobre dicts y listas. No muta el original.
-    """
+    """Copia con los valores de claves sensibles reemplazados por ***. No muta el original."""
     if isinstance(value, dict):
         return {k: (REDACTED if _is_sensitive(k) else redact(v)) for k, v in value.items()}
     if isinstance(value, list):
@@ -50,8 +81,15 @@ def _json_or_none(raw):
         return None
 
 
+def _pretty_block(obj):
+    """JSON indentado, redactado, con cada línea sangrada (en gris)."""
+    text = json.dumps(redact(obj), indent=2, ensure_ascii=False)
+    indented = "\n".join("    " + line for line in text.splitlines())
+    return _c(_DIM, indented)
+
+
 class RequestResponseLoggingMiddleware:
-    """Middleware de dev: loguea request/response redactados. Nunca rompe el request."""
+    """Middleware de dev: loguea request/response redactados y legibles. Nunca rompe el request."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -62,14 +100,27 @@ class RequestResponseLoggingMiddleware:
         response = self.get_response(request)
         try:
             dur_ms = (time.monotonic() - start) * 1000
-            logger.debug("→ %s %s", request.method, request.get_full_path())
+            verb = request.method
+            out = [
+                "",  # línea en blanco → espaciado entre requests
+                f"{_c(_DIM, time.strftime('%H:%M:%S'))}  "
+                f"{_c(_VERB_COLORS.get(verb, _MAGENTA), f'→ {verb}')} {request.get_full_path()}",
+            ]
             if req_body is not None:
-                logger.debug("  req: %s", json.dumps(redact(req_body), ensure_ascii=False))
-            logger.debug("← %s (%.0f ms)", response.status_code, dur_ms)
+                out.append(_c(_DIM, "  req:"))
+                out.append(_pretty_block(req_body))
+
+            status = response.status_code
+            out.append(
+                f"          {_c(_status_color(status), f'← {status}')} {_c(_DIM, f'({dur_ms:.0f} ms)')}"
+            )
             if response.get("Content-Type", "").startswith("application/json"):
                 resp_body = _json_or_none(getattr(response, "content", b""))
                 if resp_body is not None:
-                    logger.debug("  resp: %s", json.dumps(redact(resp_body), ensure_ascii=False))
+                    out.append(_c(_DIM, "  resp:"))
+                    out.append(_pretty_block(resp_body))
+
+            logger.debug("\n".join(out))
         except Exception:  # noqa: BLE001 — el logging jamás debe tirar el request
             logger.debug("(logging middleware: error al loguear, ignorado)")
         return response

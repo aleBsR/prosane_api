@@ -50,13 +50,17 @@ LOGGING = {
             'format': '%(asctime)s %(levelname)s %(name)s | %(message)s',
             'datefmt': '%H:%M:%S',
         },
+        # El middleware de requests ya formatea todo (timestamp, colores, JSON) →
+        # acá no agregamos prefijo.
+        'raw': {'format': '%(message)s'},
     },
     'handlers': {
         'console': {'class': 'logging.StreamHandler', 'formatter': 'dev'},
+        'console_raw': {'class': 'logging.StreamHandler', 'formatter': 'raw'},
     },
     'loggers': {
-        # Nuestro middleware de requests/responses (verboso).
-        'prosane.api': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
+        # Nuestro middleware de requests/responses (verboso, coloreado, indentado).
+        'prosane.api': {'handlers': ['console_raw'], 'level': 'DEBUG', 'propagate': False},
         # Errores/4xx-5xx de Django.
         'django.request': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
     },
