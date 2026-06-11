@@ -53,6 +53,11 @@ _VER_APTO = _a(
     icon="fact_check", color="#2E7D32", type="list", category="salud",
     is_sensitive=True, sort_order=45,
 )
+_VER_CONSENTIMIENTO = _a(
+    "verConsentimiento", "Ver consentimiento",
+    icon="fact_check", color="#455A64", type="list", category="consentimiento",
+    is_sensitive=True, sort_order=25,
+)
 
 # --- Mapa rol → acciones ---
 # ⚠️ FUENTE TEMPORAL — SOLO para el /me de Fase 1 (mapa en código).
@@ -65,6 +70,7 @@ ROLE_ACTIONS = {
         _a("verFichaClinica", "Ver ficha clínica",
            icon="clinical_notes", color="#6A1B9A", type="form", category="salud",
            is_sensitive=True, sort_order=20),
+        _VER_CONSENTIMIENTO,
         _CREAR_APTO,
         _FIRMAR_APTO,
         _VER_APTO,
@@ -74,6 +80,7 @@ ROLE_ACTIONS = {
         _a("verFichaOdontologica", "Ver ficha odontológica",
            icon="dentistry", color="#00838F", type="form", category="salud",
            is_sensitive=True, sort_order=25),
+        _VER_CONSENTIMIENTO,
         _CREAR_APTO,
         _FIRMAR_APTO,
         _VER_APTO,
@@ -91,6 +98,7 @@ ROLE_ACTIONS = {
         _a("darConsentimiento", "Dar consentimiento",
            icon="how_to_reg", color="#455A64", type="form", category="consentimiento",
            is_sensitive=True, sort_order=20),
+        _VER_CONSENTIMIENTO,
     ],
 }
 

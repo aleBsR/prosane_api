@@ -16,5 +16,7 @@
   { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000008",
     "fields": { "name": "firmarApto", "label": "Firmar apto físico", "icon": "draw", "color": "#2E7D32", "type": "form", "category": "salud", "is_sensitive": true, "sort_order": 40, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
   { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000009",
-    "fields": { "name": "verApto", "label": "Ver apto físico", "icon": "fact_check", "color": "#2E7D32", "type": "list", "category": "salud", "is_sensitive": true, "sort_order": 45, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } }
+    "fields": { "name": "verApto", "label": "Ver apto físico", "icon": "fact_check", "color": "#2E7D32", "type": "list", "category": "salud", "is_sensitive": true, "sort_order": 45, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } },
+  { "model": "authentication.action", "pk": "a0000000-0000-0000-0000-000000000010",
+    "fields": { "name": "verConsentimiento", "label": "Ver consentimiento", "icon": "fact_check", "color": "#455A64", "type": "list", "category": "consentimiento", "is_sensitive": true, "sort_order": 25, "is_active": true, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z" } }
 ]

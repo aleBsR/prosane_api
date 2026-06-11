@@ -89,3 +89,16 @@ class ConsentimientoEndpointTests(TransactionTestCase):
 
     def test_medico_sin_darConsentimiento_403(self):
         self.assertEqual(self._post(self.medico).status_code, 403)
+
+    def test_medico_lista_con_verConsentimiento_200(self):
+        from patients.views import ConsentimientoListCreateView
+        req = self.factory.get("/api/v1/consentimientos/")
+        force_authenticate(req, user=self.medico)
+        self.assertEqual(ConsentimientoListCreateView.as_view()(req).status_code, 200)
+
+    def test_ayudante_sin_verConsentimiento_403(self):
+        from patients.views import ConsentimientoListCreateView
+        ayudante = Usuarios.objects.get(email="ayudante@prosane.test")
+        req = self.factory.get("/api/v1/consentimientos/")
+        force_authenticate(req, user=ayudante)
+        self.assertEqual(ConsentimientoListCreateView.as_view()(req).status_code, 403)

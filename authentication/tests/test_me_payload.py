@@ -68,7 +68,7 @@ class ResolveActionsCodeTests(SimpleTestCase):
     def test_superuser_recibe_catalogo_completo(self):
         acts = resolve_actions_code(_user(is_superuser=True), [])
         self.assertEqual({a["name"] for a in acts}, {a["name"] for a in all_actions()})
-        self.assertEqual(len(acts), 9)
+        self.assertEqual(len(acts), 10)
 
     def test_superuser_ordenado_y_8_claves(self):
         acts = resolve_actions_code(_user(is_superuser=True), [])

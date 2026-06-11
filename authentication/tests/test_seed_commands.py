@@ -16,29 +16,29 @@ from authentication.models import Action, RoleAction, Roles, Usuarios
 class ResetPermissionsDataTests(TransactionTestCase):
     def test_carga_catalogo_completo(self):
         call_command("reset_permissions_data", verbosity=0)
-        self.assertEqual(Action.objects.count(), 9)
-        self.assertEqual(RoleAction.objects.count(), 14)
+        self.assertEqual(Action.objects.count(), 10)
+        self.assertEqual(RoleAction.objects.count(), 17)
         self.assertEqual(Roles.objects.count(), 5)
 
-    def test_medico_da_sus_5_acciones(self):
+    def test_medico_da_sus_6_acciones(self):
         call_command("reset_permissions_data", verbosity=0)
         medico = Roles.objects.get(rol="medico")
         nombres = set(medico.role_actions.values_list("action__name", flat=True))
         self.assertEqual(
-            nombres, {"listarPacientes", "verFichaClinica", "crearApto", "firmarApto", "verApto"}
+            nombres, {"listarPacientes", "verFichaClinica", "verConsentimiento", "crearApto", "firmarApto", "verApto"}
         )
 
-    def test_tutor_da_sus_2_acciones(self):
+    def test_tutor_da_sus_3_acciones(self):
         call_command("reset_permissions_data", verbosity=0)
         tutor = Roles.objects.get(rol="tutor")
         nombres = set(tutor.role_actions.values_list("action__name", flat=True))
-        self.assertEqual(nombres, {"verConstancias", "darConsentimiento"})
+        self.assertEqual(nombres, {"verConstancias", "darConsentimiento", "verConsentimiento"})
 
     def test_idempotente(self):
         call_command("reset_permissions_data", verbosity=0)
         call_command("reset_permissions_data", verbosity=0)
-        self.assertEqual(Action.objects.count(), 9)
-        self.assertEqual(RoleAction.objects.count(), 14)
+        self.assertEqual(Action.objects.count(), 10)
+        self.assertEqual(RoleAction.objects.count(), 17)
 
 
 @override_settings(SEEDS_ENABLED=True)

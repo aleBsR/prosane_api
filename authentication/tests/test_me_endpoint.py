@@ -33,7 +33,7 @@ class MeEndpointTests(TransactionTestCase):
         self.assertEqual(response.data["roles"], [{"name": "medico", "label": "Médico/a"}])
         self.assertEqual(response.data["user"]["nombre"], "Mariana")
         nombres = [a["name"] for a in response.data["actions"]]
-        self.assertEqual(nombres, ["listarPacientes", "verFichaClinica", "crearApto", "firmarApto", "verApto"])
+        self.assertEqual(nombres, ["listarPacientes", "verFichaClinica", "verConsentimiento", "crearApto", "firmarApto", "verApto"])
         for a in response.data["actions"]:
             self.assertEqual(
                 set(a.keys()),
@@ -46,4 +46,4 @@ class MeEndpointTests(TransactionTestCase):
         force_authenticate(request, user=su)
         response = me(request)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data["actions"]), 9)
+        self.assertEqual(len(response.data["actions"]), 10)

@@ -27,23 +27,23 @@ class EffectiveActionsDBTests(TransactionTestCase):
     def setUp(self):
         call_command("reset_permissions_data", "--with-users", verbosity=0)
 
-    def test_medico_5_acciones_ordenadas(self):
+    def test_medico_6_acciones_ordenadas(self):
         u = Usuarios.objects.get(email="medico@prosane.test")
         self.assertEqual(
             [a["name"] for a in effective_actions(u)],
-            ["listarPacientes", "verFichaClinica", "crearApto", "firmarApto", "verApto"],
+            ["listarPacientes", "verFichaClinica", "verConsentimiento", "crearApto", "firmarApto", "verApto"],
         )
 
-    def test_tutor_2_acciones(self):
+    def test_tutor_3_acciones(self):
         u = Usuarios.objects.get(email="tutor@prosane.test")
         self.assertEqual(
             {a["name"] for a in effective_actions(u)},
-            {"verConstancias", "darConsentimiento"},
+            {"verConstancias", "darConsentimiento", "verConsentimiento"},
         )
 
     def test_superadmin_catalogo_completo(self):
         u = Usuarios.objects.get(email="superadmin@prosane.test")
-        self.assertEqual(len(effective_actions(u)), 9)
+        self.assertEqual(len(effective_actions(u)), 10)
 
     def test_cada_accion_tiene_las_8_claves(self):
         u = Usuarios.objects.get(email="medico@prosane.test")
@@ -91,5 +91,5 @@ class ActionPermissionBackendTests(TransactionTestCase):
         backend = ActionPermissionBackend()
         tutor = Usuarios.objects.get(email="tutor@prosane.test")
         self.assertEqual(
-            backend.get_all_permissions(tutor), {"verConstancias", "darConsentimiento"}
+            backend.get_all_permissions(tutor), {"verConstancias", "darConsentimiento", "verConsentimiento"}
         )
