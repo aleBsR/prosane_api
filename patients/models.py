@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from common.models import BaseModel
 
@@ -12,6 +14,20 @@ class Responsables(BaseModel):
         db_table = 'responsables'
 
 
+class Vacunas():
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column='id_vacuna')
+    nombre = models.CharField(max_length=100, null=False)
+
+
+    class Meta:
+        managed = False
+        db_table = 'vacunas'
+
+
+
+
+
 class Pacientes(BaseModel):
     domicilio = models.ForeignKey('core.Domicilio', models.DO_NOTHING, db_column='id_domicilio')
     responsable = models.ForeignKey(Responsables, models.DO_NOTHING, db_column='id_responsable', null=True)
@@ -21,9 +37,29 @@ class Pacientes(BaseModel):
     tipo_cobertura = models.CharField(max_length=20, blank=True, null=True)
     nombre_cobertura = models.CharField(max_length=20, blank=True, null=True)
 
+    vacunas = models.ManyToManyField(
+        Vacunas,
+        through='CarnetVacunas',
+        through_fields=('id_vacuna','id_paciente')
+        related_name='usuarios'
+    )
     class Meta:
         managed = False
         db_table = 'pacientes'
+
+class CarnetVacunas():
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column='id_carnet')
+
+    vacuna = models.ForeignKey(Vacunas,models.DO_NOTHING, db_column='id_vacuna')
+    paciente = models.ForeignKey(Pacientes,models.DO_NOTHING, db_column='id_paciente')
+
+
+
+    class Meta:
+        managed = False
+        db_table = 'carnetVacunas'
+        unique_together = (('id_vacuna','id_paciente'),)
 
 
 class Antecedentesfamiliares(BaseModel):
@@ -63,3 +99,4 @@ class Antecedentespersonales(BaseModel):
     class Meta:
         managed = False
         db_table = 'antecedentespersonales'
+

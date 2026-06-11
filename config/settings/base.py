@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'authentication',
     'patients',
     'professionals',
+    'schools',
     'apidocs',
 ]
 
