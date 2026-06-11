@@ -13,6 +13,8 @@ de los comentarios es **español**.
 - `docs/modelo-de-datos.md` — **fuente de verdad del dominio** (modelo basado en la planilla PROSANE oficial).
 - `docs/stack-backend.md` — estructura de proyecto, seguridad y deployment.
 - `docs/reconciliacion-modelo.md` — **leer antes de tocar modelos**: hoy conviven tres vocabularios distintos y el modelo NO está cerrado.
+- `docs/arquitectura.md` — **mapa de apps por dominio** + convenciones (leer para ubicarse en la estructura y saber dónde va cada cosa).
+- `docs/reglas/` — playbooks paso a paso para tareas comunes (ej. `crear-accion.md`).
 - `prosane_propuesta.md` — propuesta de diseño original (actores y flujos).
 
 ## Stack actual (verificado en el código)
