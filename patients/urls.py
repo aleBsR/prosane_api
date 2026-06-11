@@ -5,6 +5,8 @@ from .views import (
     AntecedentesFamiliaresAPIView,
     AntecedentesPersonalesAPIView,
     ResponsableProfileAPIView,
+    ConsentimientoListCreateView,
+    ConsentimientoDetailView,
 )
 
 urlpatterns = [
@@ -13,4 +15,6 @@ urlpatterns = [
     path('<int:patient_id>/antecedentes-familiares/', AntecedentesFamiliaresAPIView.as_view(), name='antecedentes-familiares'),
     path('<int:patient_id>/antecedentes-personales/', AntecedentesPersonalesAPIView.as_view(), name='antecedentes-personales'),
     path('responsable/', ResponsableProfileAPIView.as_view(), name='responsable-profile'),
+    path('consentimientos/', ConsentimientoListCreateView.as_view(), name='consentimiento-list-create'),
+    path('consentimientos/<uuid:pk>/', ConsentimientoDetailView.as_view(), name='consentimiento-detail'),
 ]

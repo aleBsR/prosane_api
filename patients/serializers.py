@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db import transaction
 from core.models import Personas, Domicilio
 from core.serializers import PersonasSerializer, DomicilioSerializer
-from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales
+from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales, Consentimiento
 
 
 class ResponsablesSerializer(serializers.ModelSerializer):
@@ -97,3 +97,12 @@ class AntecedentespersonalesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Antecedentespersonales
         exclude = ['antecedente', 'paciente']
+
+
+class ConsentimientoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Consentimiento
+        fields = ['id', 'paciente', 'firma_tipo', 'adulto_nombre', 'adulto_apellido',
+                  'adulto_tipo_documento', 'adulto_dni', 'firma_hash', 'fecha_firma']
+        extra_kwargs = {'adulto_dni': {'write_only': True}}
+        read_only_fields = ['firma_hash', 'fecha_firma']

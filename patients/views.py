@@ -6,14 +6,17 @@ from django.shortcuts import get_object_or_404
 
 from authentication.permissions import require_action
 from django.db import transaction
+from django.utils import timezone
 
-from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales
+from .models import Pacientes, Responsables, Antecedentesfamiliares, Antecedentespersonales, Consentimiento
 from .serializers import (
-    PacientesSerializer, 
-    ResponsablesSerializer, 
-    AntecedentesfamiliaresSerializer, 
-    AntecedentespersonalesSerializer
+    PacientesSerializer,
+    ResponsablesSerializer,
+    AntecedentesfamiliaresSerializer,
+    AntecedentespersonalesSerializer,
+    ConsentimientoSerializer,
 )
+from patients import services
 
 class PacienteListCreateAPIView(APIView):
     permission_classes = [require_action('listarPacientes')]
@@ -190,15 +193,43 @@ class ResponsableProfileAPIView(APIView):
 
     def put(self, request):
         persona = getattr(request.user, 'persona', None)
-            
+
         responsable, created = Responsables.objects.get_or_create(
             usuario=request.user,
             defaults={'persona': persona, 'parentesco': 'OTRO'}
         )
-        
+
         serializer = ResponsablesSerializer(responsable, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
             return Response(serializer.data, status=status_code)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ConsentimientoListCreateView(APIView):
+    def get_permissions(self):
+        action = 'darConsentimiento' if self.request.method == 'POST' else 'verConsentimiento'
+        return [require_action(action)()]
+
+    def get(self, request):
+        return Response(ConsentimientoSerializer(Consentimiento.objects.all(), many=True).data)
+
+    def post(self, request):
+        s = ConsentimientoSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        v = s.validated_data
+        c = services.crear_consentimiento(
+            paciente=v['paciente'], firma_tipo=v['firma_tipo'],
+            adulto_nombre=v['adulto_nombre'], adulto_apellido=v['adulto_apellido'],
+            adulto_tipo_documento=v['adulto_tipo_documento'], adulto_dni=v['adulto_dni'],
+            now=timezone.now(),
+        )
+        return Response(ConsentimientoSerializer(c).data, status=status.HTTP_201_CREATED)
+
+
+class ConsentimientoDetailView(APIView):
+    permission_classes = [require_action('verConsentimiento')]
+
+    def get(self, request, pk):
+        return Response(ConsentimientoSerializer(get_object_or_404(Consentimiento, pk=pk)).data)
