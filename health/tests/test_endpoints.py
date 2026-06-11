@@ -50,3 +50,13 @@ class AptoEndpointsTests(TransactionTestCase):
         req2 = self.factory.patch(f"/api/v1/aptos/{apto_id}/", {"observaciones": "x"}, format="json")
         force_authenticate(req2, user=self.medico)
         self.assertEqual(AptoDetailView.as_view()(req2, pk=apto_id).status_code, 409)
+
+    def test_listar_aptos_tutor_sin_verApto_403(self):
+        req = self.factory.get("/api/v1/aptos/")
+        force_authenticate(req, user=self.tutor)
+        self.assertEqual(AptoListCreateView.as_view()(req).status_code, 403)
+
+    def test_listar_aptos_medico_con_verApto_200(self):
+        req = self.factory.get("/api/v1/aptos/")
+        force_authenticate(req, user=self.medico)
+        self.assertEqual(AptoListCreateView.as_view()(req).status_code, 200)
