@@ -30,5 +30,5 @@ class AllActionsTests(SimpleTestCase):
         crear = [a for a in all_actions() if a["name"] == "crearApto"]
         self.assertEqual(len(crear), 1)
 
-    def test_catalogo_tiene_8(self):
-        self.assertEqual(len(all_actions()), 8)
+    def test_catalogo_tiene_9(self):
+        self.assertEqual(len(all_actions()), 9)

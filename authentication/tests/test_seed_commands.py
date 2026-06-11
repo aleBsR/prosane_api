@@ -16,16 +16,16 @@ from authentication.models import Action, RoleAction, Roles, Usuarios
 class ResetPermissionsDataTests(TransactionTestCase):
     def test_carga_catalogo_completo(self):
         call_command("reset_permissions_data", verbosity=0)
-        self.assertEqual(Action.objects.count(), 8)
-        self.assertEqual(RoleAction.objects.count(), 12)
+        self.assertEqual(Action.objects.count(), 9)
+        self.assertEqual(RoleAction.objects.count(), 14)
         self.assertEqual(Roles.objects.count(), 5)
 
-    def test_medico_da_sus_4_acciones(self):
+    def test_medico_da_sus_5_acciones(self):
         call_command("reset_permissions_data", verbosity=0)
         medico = Roles.objects.get(rol="medico")
         nombres = set(medico.role_actions.values_list("action__name", flat=True))
         self.assertEqual(
-            nombres, {"listarPacientes", "verFichaClinica", "crearApto", "firmarApto"}
+            nombres, {"listarPacientes", "verFichaClinica", "crearApto", "firmarApto", "verApto"}
         )
 
     def test_tutor_da_sus_2_acciones(self):
@@ -37,8 +37,8 @@ class ResetPermissionsDataTests(TransactionTestCase):
     def test_idempotente(self):
         call_command("reset_permissions_data", verbosity=0)
         call_command("reset_permissions_data", verbosity=0)
-        self.assertEqual(Action.objects.count(), 8)
-        self.assertEqual(RoleAction.objects.count(), 12)
+        self.assertEqual(Action.objects.count(), 9)
+        self.assertEqual(RoleAction.objects.count(), 14)
 
 
 @override_settings(SEEDS_ENABLED=True)

@@ -48,6 +48,11 @@ _FIRMAR_APTO = _a(
     icon="draw", color="#2E7D32", type="form", category="salud",
     is_sensitive=True, sort_order=40,
 )
+_VER_APTO = _a(
+    "verApto", "Ver apto físico",
+    icon="fact_check", color="#2E7D32", type="list", category="salud",
+    is_sensitive=True, sort_order=45,
+)
 
 # --- Mapa rol → acciones ---
 # ⚠️ FUENTE TEMPORAL — SOLO para el /me de Fase 1 (mapa en código).
@@ -62,6 +67,7 @@ ROLE_ACTIONS = {
            is_sensitive=True, sort_order=20),
         _CREAR_APTO,
         _FIRMAR_APTO,
+        _VER_APTO,
     ],
     "odontologo": [
         _LISTAR_PACIENTES,
@@ -70,6 +76,7 @@ ROLE_ACTIONS = {
            is_sensitive=True, sort_order=25),
         _CREAR_APTO,
         _FIRMAR_APTO,
+        _VER_APTO,
     ],
     "ayudante": [
         _LISTAR_PACIENTES,

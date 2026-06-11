@@ -27,11 +27,11 @@ class EffectiveActionsDBTests(TransactionTestCase):
     def setUp(self):
         call_command("reset_permissions_data", "--with-users", verbosity=0)
 
-    def test_medico_4_acciones_ordenadas(self):
+    def test_medico_5_acciones_ordenadas(self):
         u = Usuarios.objects.get(email="medico@prosane.test")
         self.assertEqual(
             [a["name"] for a in effective_actions(u)],
-            ["listarPacientes", "verFichaClinica", "crearApto", "firmarApto"],
+            ["listarPacientes", "verFichaClinica", "crearApto", "firmarApto", "verApto"],
         )
 
     def test_tutor_2_acciones(self):
@@ -43,7 +43,7 @@ class EffectiveActionsDBTests(TransactionTestCase):
 
     def test_superadmin_catalogo_completo(self):
         u = Usuarios.objects.get(email="superadmin@prosane.test")
-        self.assertEqual(len(effective_actions(u)), 8)
+        self.assertEqual(len(effective_actions(u)), 9)
 
     def test_cada_accion_tiene_las_8_claves(self):
         u = Usuarios.objects.get(email="medico@prosane.test")
