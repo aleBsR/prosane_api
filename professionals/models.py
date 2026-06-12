@@ -1,8 +1,9 @@
 from django.db import models
-from common.models import BaseModel
 
 
-class Profesionales(BaseModel):
+class Profesionales(models.Model):
+    # Reconciliación #12: integer id, sin auditoría.
+    id = models.AutoField(primary_key=True)
     matricula = models.CharField(max_length=256)
     id_usuario = models.ForeignKey('authentication.Usuarios', models.DO_NOTHING, db_column='id_usuario')
 
@@ -11,7 +12,9 @@ class Profesionales(BaseModel):
         db_table = 'profesionales'
 
 
-class Matriculas(BaseModel):
+class Matriculas(models.Model):
+    # Reconciliación #12: integer id, sin auditoría.
+    id = models.AutoField(primary_key=True)
     numero = models.CharField(unique=True, max_length=50)
     tipo = models.CharField(max_length=20)
     nombre_completo = models.CharField(max_length=255, blank=True, null=True)

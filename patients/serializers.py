@@ -96,7 +96,18 @@ class AntecedentesfamiliaresSerializer(serializers.ModelSerializer):
 class AntecedentespersonalesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Antecedentespersonales
-        exclude = ['antecedente', 'paciente']
+        # Reconciliación #12: campos explícitos del modelo reconciliado (sin auditoría).
+        # PK real es id_antecedente; se excluye paciente porque se inyecta desde la vista.
+        fields = [
+            'id_antecedente',
+            'nacio_prematuro', 'peso_nacimiento', 'convulsiones_epilepsia',
+            'mareos_desmayos', 'infecciones_urinarias', 'asma_espasmos',
+            'tuberculosis', 'diabetes', 'hipertension', 'cardiopatia_congenita',
+            'traumatismo_internacion', 'diarrea_frecuente', 'infecciones_oido',
+            'causa_hospitalizacion', 'rabia_tratamiento', 'descripcion_tratamiento',
+            'ultima_consulta_medica', 'otros_problemas_salud',
+            'primera_menstruacion', 'edad_primera_menstruacion',
+        ]
 
 
 class ConsentimientoSerializer(serializers.ModelSerializer):

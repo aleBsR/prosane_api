@@ -30,7 +30,9 @@ class Pacientes(models.Model):
         db_table = 'pacientes'
 
 
-class Antecedentesfamiliares(BaseModel):
+class Antecedentesfamiliares(models.Model):
+    # Reconciliación #12: integer id, sin auditoría.
+    id = models.AutoField(primary_key=True)
     paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
     problemas_salud = models.CharField(max_length=10, blank=True, null=True)
     detalle_problema_salud = models.CharField(max_length=255, blank=True, null=True)
@@ -41,7 +43,9 @@ class Antecedentesfamiliares(BaseModel):
         db_table = 'antecedentesfamiliares'
 
 
-class Antecedentespersonales(BaseModel):
+class Antecedentespersonales(models.Model):
+    # Reconciliación #12: PK real es id_antecedente, integer, sin auditoría.
+    id_antecedente = models.AutoField(primary_key=True)
     paciente = models.ForeignKey(Pacientes, models.DO_NOTHING, db_column='id_paciente')
     nacio_prematuro = models.CharField(max_length=10)
     peso_nacimiento = models.CharField(max_length=10)
