@@ -58,7 +58,9 @@ def firmar_apto(apto, *, now):
     apto.nna_edad = apto.paciente.edad
     prof_persona = getattr(apto.profesional, "persona", None)
     apto.profesional_nombre = _nombre_completo(prof_persona) if prof_persona else apto.profesional.email
-    apto.matricula_firmante = None  # TODO: viene de professionals cuando se reconcilie
+    from professionals.models import Profesionales
+    prof = Profesionales.objects.filter(id_usuario=apto.profesional).first()
+    apto.matricula_firmante = prof.matricula if prof else None
     apto.fecha_emision = now.date()
     apto.validez_hasta = now.date() + timedelta(days=365)
     apto.timestamp_firma = now

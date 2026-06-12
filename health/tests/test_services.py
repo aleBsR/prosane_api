@@ -74,3 +74,14 @@ class AptoServicesTests(TransactionTestCase):
         services.firmar_apto(apto, now=NOW)
         with self.assertRaises(services.AptoInmutableError):
             services.firmar_apto(apto, now=NOW)
+
+    def test_firmar_toma_la_matricula_del_profesional(self):
+        from professionals.models import Profesionales
+        Profesionales.objects.create(id_usuario=self.medico, matricula="MP-12345")
+        try:
+            apto = services.crear_apto(paciente=self.paciente, profesional=self.medico)
+            services.firmar_apto(apto, now=NOW)
+            apto.refresh_from_db()
+            self.assertEqual(apto.matricula_firmante, "MP-12345")
+        finally:
+            Profesionales.objects.filter(id_usuario=self.medico).delete()
