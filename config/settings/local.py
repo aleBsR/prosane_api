@@ -28,3 +28,6 @@ DATABASES = {
 
 # Archivos Estáticos
 STATIC_URL = 'static/'
+
+# Seeds de desarrollo habilitados solo en local
+SEEDS_ENABLED = True

@@ -15,8 +15,11 @@ DATABASES = {
     }
 }
 
-# Hashing rápido para tests.
-PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+# Hashing rápido para tests; PBKDF2 se mantiene para verificar passwords del fixture users.json.
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.MD5PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
 
 # URLconf vacío: aísla los tests de bugs pre-existentes en config.urls
 # (p. ej. falta patients/urls.py). Ver config/test_urls.py.

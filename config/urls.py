@@ -1,12 +1,13 @@
 """
 URL configuration for config project.
 
-La rama `base` solo expone el admin de Django. Los endpoints de cada app se
-agregarán progresivamente en ramas de features.
+Rama `rama-base`: admin + endpoints de autenticación (A1).
+Los endpoints de cada app se agregarán progresivamente.
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/v1/", include("apps.usuarios.urls")),
 ]
