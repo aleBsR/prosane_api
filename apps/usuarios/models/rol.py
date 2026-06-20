@@ -18,5 +18,5 @@ class RoleUsuario(BaseModel):
 
     class Meta:
         managed = True
-        db_table = "role_usuario"
+        db_table = "roleUsuario"
         unique_together = (("id_rol", "id_user"),)
