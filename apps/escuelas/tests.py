@@ -414,3 +414,272 @@ class EscuelaAPITest(APITestCase):
         url = reverse('escuela-list-create')
         res = self.client.post(url, {'nombre': 'Test'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    # ── Filtros ──────────────────────────────────────────
+
+    def test_listar_escuelas_filtro_activa_false(self):
+        Escuela.objects.create(nombre='Activa', activa=True)
+        Escuela.objects.create(nombre='Inactiva', activa=False)
+        url = reverse('escuela-list-create')
+        res = self.client.get(f'{url}?activa=false')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]['nombre'], 'Inactiva')
+
+    def test_listar_escuelas_filtro_activa_mayuscula(self):
+        Escuela.objects.create(nombre='Activa', activa=True)
+        url = reverse('escuela-list-create')
+        res = self.client.get(f'{url}?activa=TRUE')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+
+    def test_listar_escuelas_filtro_activa_invalido(self):
+        Escuela.objects.create(nombre='Activa', activa=True)
+        url = reverse('escuela-list-create')
+        res = self.client.get(f'{url}?activa=invalido')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 0)
+
+    def test_listar_escuelas_filtro_q_sin_resultados(self):
+        Escuela.objects.create(nombre='Escuela A')
+        url = reverse('escuela-list-create')
+        res = self.client.get(f'{url}?q=inexistente')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 0)
+
+    def test_listar_escuelas_filtro_q_vacio(self):
+        Escuela.objects.create(nombre='Escuela A')
+        Escuela.objects.create(nombre='Escuela B')
+        url = reverse('escuela-list-create')
+        res = self.client.get(f'{url}?q=')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 2)
+
+    def test_listar_escuelas_orden_alfabetico(self):
+        Escuela.objects.create(nombre='Z')
+        Escuela.objects.create(nombre='M')
+        Escuela.objects.create(nombre='A')
+        url = reverse('escuela-list-create')
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        nombres = [e['nombre'] for e in res.data]
+        self.assertEqual(nombres, sorted(nombres))
+
+    # ── 404 en mutaciones ────────────────────────────────
+
+    def test_404_escuela_put_inexistente(self):
+        url = reverse('escuela-detail', args=['00000000-0000-0000-0000-000000000000'])
+        res = self.client.put(url, {'nombre': 'Nuevo'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_404_escuela_patch_inexistente(self):
+        url = reverse('escuela-detail', args=['00000000-0000-0000-0000-000000000000'])
+        res = self.client.patch(url, {'nombre': 'Nuevo'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_404_escuela_delete_inexistente(self):
+        url = reverse('escuela-detail', args=['00000000-0000-0000-0000-000000000000'])
+        res = self.client.delete(url)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_404_curso_inexistente(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('curso-detail', args=[escuela.id, '00000000-0000-0000-0000-000000000000'])
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_404_curso_escuela_pk_incorrecta(self):
+        escuela_a = Escuela.objects.create(nombre='Escuela A')
+        escuela_b = Escuela.objects.create(nombre='Escuela B')
+        curso = Curso.objects.create(escuela=escuela_a, sala_grado_anio='1°')
+        url = reverse('curso-detail', args=[escuela_b.id, curso.id])
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_listar_cursos_escuela_inexistente_retorna_vacio(self):
+        url = reverse('curso-list-create', args=['00000000-0000-0000-0000-000000000000'])
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 0)
+
+    # ── CUE duplicado via API ────────────────────────────
+
+    def test_crear_escuela_cue_duplicado_da_400(self):
+        Escuela.objects.create(nombre='Existente', cue='CUE-UNICO')
+        url = reverse('escuela-list-create')
+        res = self.client.post(url, {'nombre': 'Nueva', 'cue': 'CUE-UNICO'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # ── PUT con domicilio ────────────────────────────────
+
+    def test_actualizar_escuela_put_crea_domicilio(self):
+        escuela = Escuela.objects.create(nombre='Original')
+        url = reverse('escuela-detail', args=[escuela.id])
+        data = {
+            'nombre': 'Actualizado',
+            'domicilio': {'calle': 'Nueva Calle', 'localidad': 'Salta'},
+        }
+        res = self.client.put(url, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        escuela.refresh_from_db()
+        self.assertIsNotNone(escuela.domicilio)
+        self.assertEqual(escuela.domicilio.calle, 'Nueva Calle')
+
+    def test_actualizar_escuela_put_actualiza_domicilio_existente(self):
+        domicilio = Domicilio.objects.create(calle='Original', localidad='Salta')
+        escuela = Escuela.objects.create(nombre='Original', domicilio=domicilio)
+        url = reverse('escuela-detail', args=[escuela.id])
+        data = {
+            'nombre': 'Actualizado',
+            'domicilio': {'calle': 'Modificada', 'localidad': 'Cafayate'},
+        }
+        res = self.client.put(url, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        domicilio.refresh_from_db()
+        self.assertEqual(domicilio.calle, 'Modificada')
+        self.assertEqual(domicilio.localidad, 'Cafayate')
+
+    # ── Curso extra ──────────────────────────────────────
+
+    def test_actualizar_curso_patch(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        curso = Curso.objects.create(escuela=escuela, sala_grado_anio='1°', division='A')
+        url = reverse('curso-detail', args=[escuela.id, curso.id])
+        res = self.client.patch(url, {'division': 'B'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        curso.refresh_from_db()
+        self.assertEqual(curso.division, 'B')
+        self.assertEqual(curso.sala_grado_anio, '1°')
+
+    def test_crear_curso_datos_invalidos_da_400(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('curso-list-create', args=[escuela.id])
+        data = {'ciclo_lectivo': 'no-un-numero'}
+        res = self.client.post(url, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_eliminar_curso_soft_delete(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        curso = Curso.objects.create(escuela=escuela, sala_grado_anio='1°')
+        url = reverse('curso-detail', args=[escuela.id, curso.id])
+        res = self.client.delete(url)
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Curso.objects.count(), 0)
+        self.assertEqual(Curso.all_objects.count(), 1)
+        self.assertIsNotNone(Curso.all_objects.get(pk=curso.pk).deleted_at)
+
+
+class EscuelaAPIPermissionTest(APITestCase):
+    fixtures = ["roles", "users"]
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from django.core.management import call_command
+        call_command("seed_permissions", verbosity=0)
+
+    def _auth(self, email):
+        user = Usuario.objects.get(email=email)
+        self.client.force_authenticate(user=user)
+        return user
+
+    # ── Ayudante (verEscuelas, crearEscuela, editarEscuela, eliminarEscuela) ──
+
+    def test_ayudante_ver_escuelas(self):
+        self._auth('ayudante@prosane.test')
+        Escuela.objects.create(nombre='Test')
+        url = reverse('escuela-list-create')
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_ayudante_crear_escuela(self):
+        self._auth('ayudante@prosane.test')
+        url = reverse('escuela-list-create')
+        res = self.client.post(url, {'nombre': 'Nueva'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_ayudante_editar_escuela(self):
+        self._auth('ayudante@prosane.test')
+        escuela = Escuela.objects.create(nombre='Original')
+        url = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.put(url, {'nombre': 'Editado'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_ayudante_eliminar_escuela(self):
+        self._auth('ayudante@prosane.test')
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.delete(url)
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_ayudante_crear_curso(self):
+        self._auth('ayudante@prosane.test')
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('curso-list-create', args=[escuela.id])
+        res = self.client.post(url, {'sala_grado_anio': '1°'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    # ── Tutor (solo verEscuelas) ──
+
+    def test_tutor_ver_escuelas(self):
+        self._auth('tutor@prosane.test')
+        Escuela.objects.create(nombre='Test')
+        url = reverse('escuela-list-create')
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_tutor_ver_detalle_escuela(self):
+        self._auth('tutor@prosane.test')
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_tutor_ver_cursos(self):
+        self._auth('tutor@prosane.test')
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('curso-list-create', args=[escuela.id])
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_tutor_no_crear_escuela(self):
+        self._auth('tutor@prosane.test')
+        url = reverse('escuela-list-create')
+        res = self.client.post(url, {'nombre': 'Nueva'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tutor_no_editar_escuela(self):
+        self._auth('tutor@prosane.test')
+        escuela = Escuela.objects.create(nombre='Original')
+        url = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.put(url, {'nombre': 'Editado'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tutor_no_eliminar_escuela(self):
+        self._auth('tutor@prosane.test')
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.delete(url)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tutor_no_crear_curso(self):
+        self._auth('tutor@prosane.test')
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('curso-list-create', args=[escuela.id])
+        res = self.client.post(url, {'sala_grado_anio': '1°'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    # ── Médico (solo verOperativo, ningún permiso de escuela) ──
+
+    def test_medico_no_ver_escuelas(self):
+        self._auth('medico@prosane.test')
+        url = reverse('escuela-list-create')
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_medico_no_ver_detalle_escuela(self):
+        self._auth('medico@prosane.test')
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
