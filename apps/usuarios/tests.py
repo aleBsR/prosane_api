@@ -75,7 +75,7 @@ class SeedPermissionsTest(TestCase):
 
         call_command("seed_permissions", verbosity=0)
 
-        self.assertEqual(Action.objects.filter(is_active=True).count(), 3)
+        self.assertEqual(Action.objects.filter(is_active=True).count(), 5)
         self.assertTrue(Rol.objects.filter(rol="ayudante").exists())
         self.assertTrue(ActionRole.objects.filter(role__rol="ayudante").exists())
 
@@ -135,7 +135,7 @@ class AuthAPITest(BaseAuthFixtureTest):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("actions", res.data)
         action_names = [a["name"] for a in res.data["actions"]]
-        self.assertEqual(action_names, ["verEscuelas", "crearEscuela", "verOperativo"])
+        self.assertEqual(action_names, ["verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela", "verOperativo"])
 
     def test_me_unauthenticated(self):
         url = reverse("auth-me")
@@ -194,7 +194,7 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
     def test_me_ayudante_tiene_todas_las_acciones(self):
         user = Usuario.objects.get(email="ayudante@prosane.test")
         actions = self._action_names(user)
-        self.assertEqual(actions, {"verEscuelas", "crearEscuela", "verOperativo"})
+        self.assertEqual(actions, {"verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela", "verOperativo"})
 
     def test_me_tutor_solo_ve_escuelas(self):
         user = Usuario.objects.get(email="tutor@prosane.test")
@@ -209,4 +209,4 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
     def test_me_superuser_ve_todas_las_acciones(self):
         user = Usuario.objects.get(email="superadmin@prosane.test")
         actions = self._action_names(user)
-        self.assertEqual(actions, {"verEscuelas", "crearEscuela", "verOperativo"})
+        self.assertEqual(actions, {"verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela", "verOperativo"})

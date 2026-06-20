@@ -34,6 +34,38 @@
   {
     "model": "usuarios.action",
     "fields": {
+      "name": "editarEscuela",
+      "label": "Editar escuela",
+      "icon": "edit",
+      "color": "#1565C0",
+      "type": "crud",
+      "category": "escuelas",
+      "is_sensitive": false,
+      "sort_order": 12,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "eliminarEscuela",
+      "label": "Eliminar escuela",
+      "icon": "delete",
+      "color": "#C62828",
+      "type": "crud",
+      "category": "escuelas",
+      "is_sensitive": true,
+      "sort_order": 13,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
       "name": "verOperativo",
       "label": "Ver operativo",
       "icon": "event_note",
