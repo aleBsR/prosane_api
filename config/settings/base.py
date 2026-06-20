@@ -41,15 +41,18 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'common',
-    'core',
-    'authentication',
-    'patients',
-    'professionals',
-    'schools',
-    'apidocs',
+    'apps.personas',
+    'apps.usuarios',
+    'apps.tutores',
+    'apps.pacientes',
+    'apps.antecedentes',
+    'apps.vacunas',
+    'apps.profesionales',
+    'apps.escuelas',
+    'apps.docs',
 ]
 
-AUTH_USER_MODEL = 'authentication.Usuarios'
+AUTH_USER_MODEL = 'usuarios.Usuario'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

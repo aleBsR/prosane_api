@@ -1,14 +1,13 @@
-# Documentación — PROSANE API
+# Documentación del proyecto
 
-Documentación técnica de referencia, traída desde la investigación del proyecto
-(`Mobile/TPFinal`) y versionada acá para que viva al lado del código.
+Esta carpeta contiene documentación técnica orientada al equipo de desarrollo.
 
-| Documento | Qué es |
-|-----------|--------|
-| [`modelo-de-datos.md`](./modelo-de-datos.md) | Modelo de datos basado en la planilla PROSANE oficial (24 tablas, MVP marcado). **Fuente de verdad del dominio.** |
-| [`stack-backend.md`](./stack-backend.md) | Decisiones de stack, estructura de proyecto, seguridad y deployment. |
-| [`reconciliacion-modelo.md`](./reconciliacion-modelo.md) | Análisis de las diferencias entre el modelo documentado, `prosane_propuesta.md` y el código actual. **Estado: abierto.** |
-| [`../prosane_propuesta.md`](../prosane_propuesta.md) | Propuesta de diseño original con decisiones de actores/flujos (vocabulario `Tutor`/`Paciente`/`Visita`). |
+La documentación interactiva de la API se encuentra en la app Django
+`apps.docs`.
 
-> El resto de la documentación (investigación de contexto, marco legal extendido,
-> entregables del TP, app Flutter) queda en `Mobile/TPFinal/docs/`.
+## Contenido previsto
+
+- Arquitectura y decisiones de diseño
+- Convenciones de código
+- Guías de desarrollo local
+- Modelo de datos

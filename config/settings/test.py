@@ -7,7 +7,7 @@ SECRET_KEY = "django-insecure-test-key-only-for-tests"
 # lo realineamos al SECRET_KEY de test.
 SIMPLE_JWT = {**SIMPLE_JWT, "SIGNING_KEY": SECRET_KEY}  # noqa: F405
 
-# SQLite en memoria: evita depender de Postgres y de las tablas managed=False.
+# SQLite en memoria: evita depender de Postgres y de las tablas managed = True.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
