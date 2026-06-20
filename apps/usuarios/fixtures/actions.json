@@ -1,0 +1,50 @@
+[
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "verEscuelas",
+      "label": "Ver escuelas",
+      "icon": "school",
+      "color": "#1565C0",
+      "type": "crud",
+      "category": "escuelas",
+      "is_sensitive": false,
+      "sort_order": 10,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "crearEscuela",
+      "label": "Crear escuela",
+      "icon": "add_circle",
+      "color": "#2E7D32",
+      "type": "crud",
+      "category": "escuelas",
+      "is_sensitive": true,
+      "sort_order": 11,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "verOperativo",
+      "label": "Ver operativo",
+      "icon": "event_note",
+      "color": "#6A1B9A",
+      "type": "crud",
+      "category": "operativos",
+      "is_sensitive": false,
+      "sort_order": 20,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  }
+]

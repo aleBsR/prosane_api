@@ -1,4 +1,7 @@
-"""URLconf vacío para aislar los tests de rutas no implementadas en la rama base."""
-from django.urls import path
+"""URLconf para tests: incluye rutas de autenticación y tutores."""
+from django.urls import path, include
 
-urlpatterns = []
+urlpatterns = [
+    path("api/v1/", include("apps.usuarios.urls")),
+    path("api/v1/", include("apps.tutores.urls")),
+]
