@@ -20,20 +20,29 @@ class Action(BaseModel):
         ordering = ['category', 'sort_order']
 
     def __str__(self):
-        return f"{self.label} ,{self.name}"
+        return f'{self.label} ({self.name})'
 
 
 class ActionRole(BaseModel):
-
-    rol = models.ForeignKey('usuario.rol', on_delete=models.CASCADE, related_name='action_role', db_column='id_rol')
-    action = models.ForeignKey(Action, on_delete=models.CASCADE, related_name='action_role', db_column='id_action')
+    role = models.ForeignKey(
+        'usuarios.Rol',
+        on_delete=models.CASCADE,
+        related_name='action_roles',
+        db_column='id_rol',
+    )
+    action = models.ForeignKey(
+        Action,
+        on_delete=models.CASCADE,
+        related_name='action_roles',
+        db_column='id_action',
+    )
 
     class Meta:
         db_table = 'action_roles'
-        unique_together = (('rol','action'),)
+        unique_together = (('role', 'action'),)
 
     def __str__(self):
-        return f'{self.rol} -> {self.action}'
+        return f'{self.role.rol} → {self.action.name}'
 
 
 

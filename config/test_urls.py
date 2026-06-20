@@ -1,4 +1,6 @@
-"""URLconf vacío para aislar los tests de rutas no implementadas en la rama base."""
-from django.urls import path
+"""URLconf para tests: incluye las rutas de autenticación data-driven."""
+from django.urls import path, include
 
-urlpatterns = []
+urlpatterns = [
+    path("api/v1/", include("apps.usuarios.urls")),
+]
