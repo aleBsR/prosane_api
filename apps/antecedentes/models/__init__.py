@@ -1,0 +1,2 @@
+from apps.antecedentes.models.antecedentefamiliar import AntecedenteFamiliar
+from apps.antecedentes.models.antecedentepersonal import AntecedentePersonal

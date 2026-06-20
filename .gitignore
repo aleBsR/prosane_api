@@ -17,3 +17,11 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Carpetas
+.der
+.opencode
+
+TODO_pacientes.md
+AGENTS.md
+

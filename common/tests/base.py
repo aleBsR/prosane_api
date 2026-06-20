@@ -1,0 +1,62 @@
+from django.apps import apps as global_apps
+from django.db import connection, models
+from django.test import TransactionTestCase
+from django.test.utils import isolate_apps
+
+from common.models import BaseModel
+
+
+class AuditModelTestCase(TransactionTestCase):
+    """Construye un modelo concreto efímero que hereda BaseModel.
+
+    BaseModel es abstracto (no tiene tabla). Para probarlo creamos un modelo
+    concreto en un registro de apps aislado y su tabla con schema_editor, y la
+    borramos al terminar. Así no ensuciamos el esquema real.
+
+    Usamos TransactionTestCase (en vez de TestCase) porque el schema_editor de
+    SQLite necesita deshabilitar foreign keys, lo que no es posible dentro de
+    un bloque atómico (que TestCase usa para aislar cada test).
+
+    Las tablas de `personas` y `usuarios` ya existen en la base de tests porque
+    sus modelos son `managed = True` y las migraciones las crean. Solo creamos
+    la tabla efímera de `AuditExample`.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._app_isolation = isolate_apps("common", "apps.usuarios")
+        isolated_apps = cls._app_isolation.enable()
+        cls.addClassCleanup(cls._app_isolation.disable)
+
+        # Re-registrar los modelos reales de usuarios en el registro
+        # aislado para que ForeignKey(settings.AUTH_USER_MODEL) resuelva.
+        for model in global_apps.get_app_config("usuarios").get_models():
+            isolated_apps.all_models[model._meta.app_label][
+                model._meta.model_name
+            ] = model
+
+        class AuditExample(BaseModel):
+            name = models.CharField(max_length=50, blank=True, default="")
+
+            class Meta:
+                app_label = "common"
+
+        cls.AuditExample = AuditExample
+
+        with connection.schema_editor() as schema_editor:
+            schema_editor.create_model(AuditExample)
+
+        cls.addClassCleanup(cls._drop_tables)
+
+    @classmethod
+    def _drop_tables(cls):
+        with connection.schema_editor() as schema_editor:
+            schema_editor.delete_model(cls.AuditExample)
+
+    def tearDown(self):
+        # Limpiamos las filas efímeras: TransactionTestCase solo vacía modelos
+        # del registro real, no nuestro AuditExample aislado. Usamos hard_delete
+        # porque el delete() masivo de all_objects ahora es soft.
+        self.AuditExample.all_objects.all().hard_delete()
+        super().tearDown()
