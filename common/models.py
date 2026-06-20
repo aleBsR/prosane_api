@@ -69,15 +69,6 @@ class AuditModel(models.Model):
         self.deleted_at = None
         self.save(update_fields=["deleted_at", "updated_at"])
 
-    def hard_delete(self, using=None, keep_parents=False):
-        """Borrado real de la fila. Explícito, para casos puntuales."""
-        super().delete(using=using, keep_parents=keep_parents)
-
-    def restore(self):
-        self.deleted_at = None
-        self.save(update_fields=["deleted_at", "updated_at"])
-
-
 class BaseModel(UUIDPrimaryKeyModel, AuditModel):
     """Lo que hereda la mayoría de las tablas del dominio."""
 
