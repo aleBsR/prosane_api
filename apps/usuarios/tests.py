@@ -1,5 +1,6 @@
 from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -76,7 +77,7 @@ class SeedPermissionsTest(TestCase):
 
         call_command("seed_permissions", verbosity=0)
 
-        self.assertEqual(Action.objects.filter(is_active=True).count(), 13)
+        self.assertEqual(Action.objects.filter(is_active=True).count(), 15)
         self.assertTrue(Rol.objects.filter(rol="ayudante").exists())
         self.assertTrue(ActionRole.objects.filter(role__rol="ayudante").exists())
 
@@ -209,10 +210,10 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
             "gestionarEstadoAlumnoEnOperativo",
         })
 
-    def test_me_tutor_solo_ve_escuelas(self):
+    def test_me_tutor_ve_escuelas_y_familia(self):
         user = Usuario.objects.get(email="tutor@prosane.test")
         actions = self._action_names(user)
-        self.assertEqual(actions, {"verEscuelas"})
+        self.assertEqual(actions, {"verEscuelas", "registrarHijo", "verHijos"})
 
     def test_me_medico_solo_ve_operativo(self):
         user = Usuario.objects.get(email="medico@prosane.test")
@@ -228,6 +229,7 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
             "confirmarOperativo", "finalizarOperativo", "cancelarOperativo",
             "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
             "gestionarEstadoAlumnoEnOperativo",
+            "registrarHijo", "verHijos",
         })
 
 
@@ -286,3 +288,17 @@ class MeContractTest(APITestCase):
         self.assertIsInstance(res.data["actions"], list)
         self.assertIn("version", res.data["meta"])
         self.assertIn("permissions_synced_at", res.data["meta"])
+
+
+class TutorAccionesFamiliaTest(APITestCase):
+    def setUp(self):
+        call_command("seed_permissions")
+        self.user = Usuario.objects.create_user(email="tutor2@example.com", password="test1234")
+        self.user.roles.add(Rol.objects.get(rol="tutor"))
+        self.client.force_authenticate(self.user)
+
+    def test_tutor_ve_acciones_de_familia(self):
+        res = self.client.get(reverse("auth-me"))
+        names = {a["name"] for a in res.data["actions"]}
+        self.assertIn("registrarHijo", names)
+        self.assertIn("verHijos", names)
