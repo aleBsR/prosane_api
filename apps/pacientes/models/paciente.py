@@ -24,6 +24,13 @@ class Paciente(BaseModel):
     tipo_cobertura = models.CharField(max_length=20, blank=True, null=True)
     nombre_cobertura = models.CharField(max_length=20, blank=True, null=True)
 
+    consentimiento_aceptado = models.BooleanField(default=False)
+    fecha_consentimiento = models.DateTimeField(null=True, blank=True)
+    adulto_nombre = models.CharField(max_length=200, blank=True, null=True)
+    adulto_apellido = models.CharField(max_length=200, blank=True, null=True)
+    adulto_tipo_documento = models.CharField(max_length=20, blank=True, null=True)
+    adulto_dni = models.CharField(max_length=15, blank=True, null=True)
+
     class Meta:
         managed = True
         db_table = "pacientes"
