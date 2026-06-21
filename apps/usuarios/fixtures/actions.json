@@ -78,5 +78,133 @@
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
     }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "crearOperativo",
+      "label": "Crear operativo",
+      "icon": "add_circle",
+      "color": "#2E7D32",
+      "type": "crud",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 21,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "editarOperativo",
+      "label": "Editar operativo",
+      "icon": "edit",
+      "color": "#6A1B9A",
+      "type": "crud",
+      "category": "operativos",
+      "is_sensitive": false,
+      "sort_order": 22,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "confirmarOperativo",
+      "label": "Confirmar operativo",
+      "icon": "check_circle",
+      "color": "#2E7D32",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 23,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "finalizarOperativo",
+      "label": "Finalizar operativo",
+      "icon": "flag",
+      "color": "#1565C0",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 24,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cancelarOperativo",
+      "label": "Cancelar operativo",
+      "icon": "cancel",
+      "color": "#C62828",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 25,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "gestionarProfesionalesEnOperativo",
+      "label": "Gestionar profesionales en operativo",
+      "icon": "people",
+      "color": "#6A1B9A",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 26,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "importarNominaOperativo",
+      "label": "Importar nómina de operativo",
+      "icon": "upload_file",
+      "color": "#6A1B9A",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 27,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "gestionarEstadoAlumnoEnOperativo",
+      "label": "Gestionar estado de alumno en operativo",
+      "icon": "assignment_turned_in",
+      "color": "#1565C0",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": false,
+      "sort_order": 28,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
   }
 ]

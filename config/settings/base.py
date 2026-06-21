@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'apps.vacunas',
     'apps.profesionales',
     'apps.escuelas',
+    'apps.operativos',
     'apps.docs',
 ]
 
