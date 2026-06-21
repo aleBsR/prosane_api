@@ -63,7 +63,7 @@ def crear_hijo(tutor_id, data):
 
         if parentesco:
             tutor.parentesco = parentesco
-            tutor.save(update_fields=["parentesco", "updated_at"])
+            tutor.save(update_fields=["parentesco", "updated_at", "updated_year", "updated_year_month"])
 
     return paciente
 
