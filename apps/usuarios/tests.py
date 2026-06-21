@@ -228,3 +228,32 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
             "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
             "gestionarEstadoAlumnoEnOperativo",
         })
+
+
+class AuthTokenAliasTest(APITestCase):
+    def setUp(self):
+        self.user = Usuario.objects.create_user(email="t@example.com", password="test1234")
+
+    def test_token_alias_devuelve_access_y_refresh(self):
+        res = self.client.post(
+            reverse("auth-token"),
+            {"email": "t@example.com", "password": "test1234"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("access", res.data)
+        self.assertIn("refresh", res.data)
+
+    def test_token_refresh_alias_devuelve_access(self):
+        login = self.client.post(
+            reverse("auth-token"),
+            {"email": "t@example.com", "password": "test1234"},
+            format="json",
+        )
+        res = self.client.post(
+            reverse("auth-token-refresh"),
+            {"refresh": login.data["refresh"]},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("access", res.data)
