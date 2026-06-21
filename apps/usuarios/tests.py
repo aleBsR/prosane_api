@@ -4,6 +4,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.personas.models import Persona
 from apps.usuarios.models import Action, ActionRole, Rol
 from apps.usuarios.action_resolution import effective_actions
 from apps.usuarios.permissions import require_action
@@ -123,7 +124,7 @@ class AuthAPITest(BaseAuthFixtureTest):
         url = reverse("auth-me")
         res = self.client.get(url)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(res.data["email"], "medico@prosane.test")
+        self.assertEqual(res.data["user"]["email"], "medico@prosane.test")
         self.assertIn("roles", res.data)
         self.assertIn("actions", res.data)
 
@@ -257,3 +258,31 @@ class AuthTokenAliasTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("access", res.data)
+
+
+class MeContractTest(APITestCase):
+    def setUp(self):
+        persona = Persona.objects.create(
+            nombre="Ana", apellido="García", dni="22222222",
+            tipo_dni="DNI", sexo="F", fecha_nacimiento="1990-01-01",
+        )
+        self.user = Usuario.objects.create_user(
+            email="ana@example.com", password="test1234", persona=persona,
+        )
+        rol, _ = Rol.objects.get_or_create(rol="tutor")
+        self.user.roles.add(rol)
+        self.client.force_authenticate(self.user)
+
+    def test_me_devuelve_shape_congelado(self):
+        res = self.client.get(reverse("auth-me"))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["user"]["nombre"], "Ana")
+        self.assertEqual(res.data["user"]["apellido"], "García")
+        self.assertEqual(res.data["user"]["email"], "ana@example.com")
+        self.assertIn("is_staff", res.data["user"])
+        self.assertIn("tutor_id", res.data["user"])
+        self.assertEqual(res.data["roles"][0]["name"], "tutor")
+        self.assertIn("label", res.data["roles"][0])
+        self.assertIsInstance(res.data["actions"], list)
+        self.assertIn("version", res.data["meta"])
+        self.assertIn("permissions_synced_at", res.data["meta"])
