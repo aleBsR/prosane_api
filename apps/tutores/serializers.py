@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.antecedentes.models import AntecedenteFamiliar, AntecedentePersonal
 from apps.pacientes.models import Paciente
 from apps.personas.models import Domicilio, Persona
 from apps.tutores.models import Tutor
@@ -46,6 +47,32 @@ class TutorRegistrationSerializer(serializers.Serializer):
         return attrs
 
 
+_AUDIT_FIELDS = [
+    "id", "paciente", "created_at", "created_year", "created_year_month",
+    "updated_at", "updated_year", "updated_year_month",
+    "created_by", "updated_by", "deleted_at",
+]
+
+
+class AntecedentePersonalInputSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AntecedentePersonal
+        exclude = _AUDIT_FIELDS
+
+
+class AntecedenteFamiliarInputSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AntecedenteFamiliar
+        exclude = _AUDIT_FIELDS
+
+
+class ConsentimientoInputSerializer(serializers.Serializer):
+    adulto_nombre = serializers.CharField()
+    adulto_apellido = serializers.CharField()
+    adulto_tipo_documento = serializers.CharField()
+    adulto_dni = serializers.CharField()
+
+
 class HijoCreateSerializer(serializers.Serializer):
     """Serializer de entrada para crear un hijo (Paciente)."""
 
@@ -55,6 +82,10 @@ class HijoCreateSerializer(serializers.Serializer):
     tiene_cud = serializers.CharField(required=False, allow_blank=True)
     tipo_cobertura = serializers.CharField(required=False, allow_blank=True)
     nombre_cobertura = serializers.CharField(required=False, allow_blank=True)
+    parentesco = serializers.CharField(required=False, allow_blank=True)
+    antecedentes_personales = AntecedentePersonalInputSerializer(required=False)
+    antecedentes_familiares = AntecedenteFamiliarInputSerializer(required=False)
+    consentimiento = ConsentimientoInputSerializer(required=False)
 
     def validate(self, attrs):
         dni = attrs.get("persona", {}).get("dni")
@@ -89,6 +120,8 @@ class HijoOutputSerializer(serializers.ModelSerializer):
         fields = [
             "id", "persona", "domicilio", "tutor", "edad",
             "tiene_cud", "tipo_cobertura", "nombre_cobertura",
+            "consentimiento_aceptado", "fecha_consentimiento",
+            "adulto_nombre", "adulto_apellido", "adulto_tipo_documento",
         ]
 
 
