@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import datetime
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -92,6 +93,22 @@ def asignar_profesional(operativo_id, profesional_id, rol):
 
 
 # ──────────────────────────────────────────────
+#  Remover profesional
+# ──────────────────────────────────────────────
+def remover_profesional(operativo_id, profesional_rel_id):
+    operativo = get_object_or_404(Operativo, pk=operativo_id)
+
+    if operativo.estado != Operativo.BORRADOR:
+        raise ValueError('Solo se pueden remover profesionales en estado borrador')
+
+    rel = get_object_or_404(
+        OperativoProfesional, operativo=operativo, pk=profesional_rel_id,
+    )
+    rel.delete()
+    return operativo
+
+
+# ──────────────────────────────────────────────
 #  Confirmar
 # ──────────────────────────────────────────────
 def confirmar_operativo(operativo_id):
@@ -115,8 +132,11 @@ def confirmar_operativo(operativo_id):
 def finalizar_operativo(operativo_id):
     operativo = get_object_or_404(Operativo, pk=operativo_id)
 
-    if operativo.estado not in (Operativo.CONFIRMADO, Operativo.EN_CURSO):
-        raise ValueError(f'Solo se puede finalizar un operativo confirmado o en curso (estado actual: {operativo.estado})')
+    if operativo.estado != Operativo.EN_CURSO:
+        raise ValueError(
+            f'Solo se puede finalizar un operativo en curso '
+            f'(estado actual: {operativo.estado})'
+        )
 
     no_evaluados = operativo.alumnos.exclude(
         estado__in=[OperativoAlumno.AUSENTE, OperativoAlumno.EVALUADO],
@@ -127,9 +147,7 @@ def finalizar_operativo(operativo_id):
             f'{no_evaluados.count()} alumnos pendientes.'
         )
 
-    operativo.estado = Operativo.FINALIZADO
-    operativo.save(update_fields=['estado', 'updated_at'])
-    return operativo
+    return transicionar_estado(operativo_id, Operativo.FINALIZADO)
 
 
 # ──────────────────────────────────────────────
@@ -194,7 +212,6 @@ def _parse_fecha(value):
     if not value:
         return None
     try:
-        from datetime import datetime
         return datetime.strptime(value, '%d/%m/%Y').date()
     except (ValueError, TypeError):
         return None

@@ -247,6 +247,7 @@ class ServiciosTest(TestCase):
             operativo=op, apellido='García', nombre='Juan', dni='12345678',
         )
         services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
         with self.assertRaises(ValueError):
             services.finalizar_operativo(op.id)
 
@@ -257,6 +258,7 @@ class ServiciosTest(TestCase):
             operativo=op, apellido='García', nombre='Juan', dni='12345678',
         )
         services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
         alumno.estado = OperativoAlumno.EVALUADO
         alumno.save()
         op = services.finalizar_operativo(op.id)
@@ -284,6 +286,7 @@ class ServiciosTest(TestCase):
             operativo=op, apellido='Test', nombre='Test', dni='99999999',
         )
         services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
         alumno.estado = OperativoAlumno.EVALUADO
         alumno.save()
         services.finalizar_operativo(op.id)
@@ -367,6 +370,7 @@ class ImportarCSVTest(TestCase):
             operativo=op, apellido='Test', nombre='Test', dni='99999999',
         )
         services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
         alumno.estado = OperativoAlumno.EVALUADO
         alumno.save()
         services.finalizar_operativo(op.id)
@@ -529,6 +533,7 @@ class OperativoAPITest(APITestCase):
         services.asignar_profesional(op.id, self.medico.id, 'medico')
         alumno = self._create_alumno(op)
         services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
         alumno.estado = OperativoAlumno.EVALUADO
         alumno.save()
         response = self.client.post(f'/api/v1/operativos/{op.id}/finalizar/')
@@ -540,6 +545,7 @@ class OperativoAPITest(APITestCase):
         services.asignar_profesional(op.id, self.medico.id, 'medico')
         self._create_alumno(op)
         services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
         response = self.client.post(f'/api/v1/operativos/{op.id}/finalizar/')
         self.assertEqual(response.status_code, 409)
 
@@ -666,3 +672,72 @@ class OperativoAPITest(APITestCase):
         self.client.force_authenticate(user=self.medico)
         response = self.client.get('/api/v1/operativos/')
         self.assertEqual(len(response.data), 0)
+
+    # ─── Aislamiento a nivel de objeto ───
+    def test_ayudante_no_ve_operativo_de_otro_ayudante(self):
+        op = self._create_operativo(created_by=self.otro_ayudante)
+        response = self.client.get(f'/api/v1/operativos/{op.id}/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_medico_no_ve_operativo_no_asignado(self):
+        op = self._create_operativo(created_by=self.otro_ayudante)
+        self.client.force_authenticate(user=self.medico)
+        response = self.client.get(f'/api/v1/operativos/{op.id}/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_ayudante_no_lista_alumnos_de_otro_ayudante(self):
+        op = self._create_operativo(created_by=self.otro_ayudante)
+        self._create_alumno(op)
+        response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_medico_no_lista_alumnos_de_no_asignado(self):
+        op = self._create_operativo(created_by=self.otro_ayudante)
+        self._create_alumno(op)
+        self.client.force_authenticate(user=self.medico)
+        response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_ayudante_no_confirma_operativo_de_otro_ayudante(self):
+        op = self._create_operativo(created_by=self.otro_ayudante)
+        services.asignar_profesional(op.id, self.medico.id, 'medico')
+        self._create_alumno(op)
+        response = self.client.post(f'/api/v1/operativos/{op.id}/confirmar/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_ayudante_no_cancela_operativo_de_otro_ayudante(self):
+        op = self._create_operativo(created_by=self.otro_ayudante)
+        response = self.client.delete(f'/api/v1/operativos/{op.id}/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_ayudante_no_asigna_profesional_en_operativo_de_otro(self):
+        op = self._create_operativo(created_by=self.otro_ayudante)
+        data = {'profesional': str(self.medico.id), 'rol_en_operativo': 'medico'}
+        response = self.client.post(
+            f'/api/v1/operativos/{op.id}/profesionales/asignar/',
+            data, format='json',
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_ayudante_no_importa_csv_en_operativo_de_otro(self):
+        op = self._create_operativo(created_by=self.otro_ayudante)
+        csv_content = 'apellido,nombre,tipo_dni,dni,fecha_nacimiento,sexo\nGarcía,Juan,DNI,12345678,15/03/2015,M\n'
+        csv_file = SimpleUploadedFile(
+            'alumnos.csv', csv_content.encode('utf-8-sig'),
+            content_type='text/csv',
+        )
+        response = self.client.post(
+            f'/api/v1/operativos/{op.id}/alumnos/importar-csv/',
+            {'archivo': csv_file}, format='multipart',
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_no_remover_profesional_de_operativo_confirmado(self):
+        op = self._create_operativo()
+        rel = services.asignar_profesional(op.id, self.medico.id, 'medico')
+        self._create_alumno(op)
+        services.confirmar_operativo(op.id)
+        response = self.client.delete(
+            f'/api/v1/operativos/{op.id}/profesionales/{rel.id}/remover/',
+        )
+        self.assertEqual(response.status_code, 409)
