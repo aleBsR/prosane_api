@@ -24,7 +24,10 @@ ROLE_ACTIONS = {
     ],
     "medico": ["verOperativo", "gestionarEstadoAlumnoEnOperativo"],
     "odontologo": ["verOperativo", "gestionarEstadoAlumnoEnOperativo"],
-    "tutor": ["verEscuelas", "registrarHijo", "verHijos"],
+    "tutor": [
+        "verEscuelas", "registrarHijo", "verHijos",
+        "darConsentimiento", "cargarAntecedentesFamiliares",
+    ],
 }
 
 

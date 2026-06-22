@@ -238,5 +238,37 @@
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
     }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "darConsentimiento",
+      "label": "Dar consentimiento",
+      "icon": "check_circle",
+      "color": "#6A4C93",
+      "type": "action",
+      "category": "familia",
+      "is_sensitive": true,
+      "sort_order": 52,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cargarAntecedentesFamiliares",
+      "label": "Cargar antecedentes familiares",
+      "icon": "medical_information",
+      "color": "#6A4C93",
+      "type": "action",
+      "category": "familia",
+      "is_sensitive": true,
+      "sort_order": 53,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
   }
 ]

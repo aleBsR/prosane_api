@@ -3,12 +3,21 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
+from apps.usuarios.permissions import require_action
 from apps.tutores.serializers import (
+    AntecedenteFamiliarTutorSerializer,
     HijoCreateSerializer,
     HijoOutputSerializer,
+    TutorConsentimientoOutputSerializer,
     TutorRegistrationSerializer,
 )
 from apps.tutores.services.hijos import HijosError, crear_hijo, listar_hijos
+from apps.tutores.services.perfil_tutor import (
+    TutorProfileError,
+    aceptar_consentimiento,
+    actualizar_antecedente_familiar,
+    obtener_o_crear_antecedente_familiar,
+)
 from apps.tutores.services.registration import TutorRegistrationError, registrar_tutor
 
 
@@ -89,3 +98,56 @@ class TutorHijosView(APIView):
 
         output = HijoOutputSerializer(hijo)
         return Response(output.data, status=status.HTTP_201_CREATED)
+
+
+class TutorConsentimientoView(APIView):
+    """POST /api/v1/tutores/<uuid:pk>/consentimiento/ — aceptar consentimiento general del tutor."""
+
+    permission_classes = [require_action("darConsentimiento")]
+
+    def post(self, request, pk):
+        try:
+            tutor = aceptar_consentimiento(pk, request.user)
+        except TutorProfileError as exc:
+            return Response(
+                {exc.field or "detail": exc.message},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = TutorConsentimientoOutputSerializer(tutor)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class TutorAntecedentesFamiliaresView(APIView):
+    """GET/POST /api/v1/tutores/<uuid:pk>/antecedentes-familiares/ — antecedentes familiares del tutor."""
+
+    permission_classes = [require_action("cargarAntecedentesFamiliares")]
+
+    def get(self, request, pk):
+        try:
+            antecedente = obtener_o_crear_antecedente_familiar(pk, request.user)
+        except TutorProfileError as exc:
+            return Response(
+                {exc.field or "detail": exc.message},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = AntecedenteFamiliarTutorSerializer(antecedente)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, pk):
+        serializer = AntecedenteFamiliarTutorSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            antecedente = actualizar_antecedente_familiar(
+                pk, request.user, serializer.validated_data
+            )
+        except TutorProfileError as exc:
+            return Response(
+                {exc.field or "detail": exc.message},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        output = AntecedenteFamiliarTutorSerializer(antecedente)
+        return Response(output.data, status=status.HTTP_200_OK)

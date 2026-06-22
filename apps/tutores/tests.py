@@ -1,8 +1,9 @@
+from django.core.management import call_command
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.antecedentes.models import AntecedenteFamiliar, AntecedentePersonal
+from apps.antecedentes.models import AntecedenteFamiliar, AntecedenteFamiliarTutor, AntecedentePersonal
 from apps.pacientes.models import Paciente
 from apps.personas.models import Domicilio, Persona
 from apps.tutores.models import Tutor
@@ -85,6 +86,7 @@ class TutorHijosAPITest(APITestCase):
             persona=self.persona_tutor,
             usuario=self.usuario_tutor,
             parentesco="padre",
+            consentimiento_aceptado=True,
         )
 
     def _hijo_payload(self, dni="33333333"):
@@ -174,7 +176,10 @@ class CrearHijoAgregadoTest(APITestCase):
             nombre="Pedro", apellido="Papá", dni="40000000",
             tipo_dni="DNI", sexo="M", fecha_nacimiento="1982-02-02",
         )
-        self.tutor = Tutor.objects.create(persona=persona, usuario=self.usuario, parentesco="")
+        self.tutor = Tutor.objects.create(
+            persona=persona, usuario=self.usuario, parentesco="",
+            consentimiento_aceptado=True,
+        )
         self.client.force_authenticate(self.usuario)
 
     def _body(self, dni="60000000"):
@@ -193,22 +198,16 @@ class CrearHijoAgregadoTest(APITestCase):
                 "detalle_problema_salud": "Hipertensión materna",
                 "familiar_con_muerte_subita": "NO",
             },
-            "consentimiento": {
-                "adulto_nombre": "Pedro", "adulto_apellido": "Papá",
-                "adulto_tipo_documento": "DNI", "adulto_dni": "40000000",
-            },
         }
 
-    def test_crea_hijo_con_antecedentes_y_consentimiento(self):
+    def test_crea_hijo_con_antecedentes_personales(self):
         url = reverse("tutor-hijos", kwargs={"pk": self.tutor.id})
         res = self.client.post(url, self._body(), format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         paciente_id = res.data["id"]
         self.assertEqual(AntecedentePersonal.objects.filter(paciente_id=paciente_id).count(), 1)
-        self.assertEqual(AntecedenteFamiliar.objects.filter(paciente_id=paciente_id).count(), 1)
-        self.assertTrue(Paciente.objects.get(id=paciente_id).consentimiento_aceptado)
-        self.assertEqual(Paciente.objects.get(id=paciente_id).adulto_dni, "40000000")
-        self.assertNotIn("adulto_dni", res.data)
+        self.assertEqual(AntecedenteFamiliar.objects.filter(paciente_id=paciente_id).count(), 0)
+        self.assertEqual(res.data["adulto"]["dni"], "40000000")
         self.tutor.refresh_from_db()
         self.assertEqual(self.tutor.parentesco, "padre")
 
@@ -229,3 +228,135 @@ class CrearHijoAgregadoTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(AntecedentePersonal.objects.count(), 0)
         self.assertEqual(Paciente.objects.count(), 0)
+
+
+class TutorConsentimientoAPITest(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0)
+
+    def setUp(self):
+        from apps.usuarios.models import Rol
+
+        self.persona = Persona.objects.create(
+            nombre="Juan", apellido="Pérez", dni="70000000",
+            tipo_dni="DNI", sexo="M", fecha_nacimiento="1985-03-15",
+        )
+        self.usuario = Usuario.objects.create_user(
+            email="tutor@example.com", password="test1234", persona=self.persona
+        )
+        self.rol_tutor = Rol.objects.get(rol="tutor")
+        self.usuario.roles.add(self.rol_tutor)
+        self.tutor = Tutor.objects.create(
+            persona=self.persona, usuario=self.usuario, parentesco="padre"
+        )
+        self.client.force_authenticate(user=self.usuario)
+
+    def test_aceptar_consentimiento(self):
+        url = reverse("tutor-consentimiento", kwargs={"pk": self.tutor.id})
+        res = self.client.post(url, {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data["consentimiento_aceptado"])
+        self.assertIsNotNone(res.data["fecha_consentimiento"])
+        self.tutor.refresh_from_db()
+        self.assertTrue(self.tutor.consentimiento_aceptado)
+
+    def test_aceptar_consentimiento_es_idempotente(self):
+        url = reverse("tutor-consentimiento", kwargs={"pk": self.tutor.id})
+        self.client.post(url, {}, format="json")
+        res = self.client.post(url, {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data["consentimiento_aceptado"])
+
+    def test_otro_usuario_no_puede_aceptar_consentimiento(self):
+        otro = Usuario.objects.create_user(email="otro@example.com", password="test1234")
+        self.client.force_authenticate(user=otro)
+        url = reverse("tutor-consentimiento", kwargs={"pk": self.tutor.id})
+        res = self.client.post(url, {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class TutorAntecedentesFamiliaresAPITest(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0)
+
+    def setUp(self):
+        from apps.usuarios.models import Rol
+
+        self.persona = Persona.objects.create(
+            nombre="Juan", apellido="Pérez", dni="71000000",
+            tipo_dni="DNI", sexo="M", fecha_nacimiento="1985-03-15",
+        )
+        self.usuario = Usuario.objects.create_user(
+            email="tutor@example.com", password="test1234", persona=self.persona
+        )
+        self.rol_tutor = Rol.objects.get(rol="tutor")
+        self.usuario.roles.add(self.rol_tutor)
+        self.tutor = Tutor.objects.create(
+            persona=self.persona, usuario=self.usuario, parentesco="padre"
+        )
+        self.client.force_authenticate(user=self.usuario)
+
+    def test_crear_y_obtener_antecedentes(self):
+        url = reverse("tutor-antecedentes-familiares", kwargs={"pk": self.tutor.id})
+        payload = {
+            "problema_salud_importante": "si",
+            "problema_salud_cual": "Hipertensión",
+            "muerte_subita_familiar": "no",
+        }
+        res = self.client.post(url, payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["problema_salud_importante"], "si")
+        self.assertEqual(res.data["problema_salud_cual"], "Hipertensión")
+
+        res_get = self.client.get(url)
+        self.assertEqual(res_get.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_get.data["muerte_subita_familiar"], "no")
+        self.assertEqual(AntecedenteFamiliarTutor.objects.count(), 1)
+
+    def test_otro_usuario_no_puede_ver_antecedentes(self):
+        otro = Usuario.objects.create_user(email="otro@example.com", password="test1234")
+        self.client.force_authenticate(user=otro)
+        url = reverse("tutor-antecedentes-familiares", kwargs={"pk": self.tutor.id})
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class HijoRequiereConsentimientoAPITest(APITestCase):
+    def setUp(self):
+        self.persona = Persona.objects.create(
+            nombre="Juan", apellido="Pérez", dni="72000000",
+            tipo_dni="DNI", sexo="M", fecha_nacimiento="1985-03-15",
+        )
+        self.usuario = Usuario.objects.create_user(
+            email="tutor@example.com", password="test1234", persona=self.persona
+        )
+        self.tutor = Tutor.objects.create(
+            persona=self.persona, usuario=self.usuario, parentesco="padre"
+        )
+        self.client.force_authenticate(user=self.usuario)
+
+    def _body(self, dni="73000000"):
+        return {
+            "persona": {
+                "nombre": "Hija", "apellido": "Pérez", "dni": dni,
+                "tipo_dni": "DNI", "sexo": "F", "fecha_nacimiento": "2015-06-01",
+            },
+            "domicilio": {"calle": "Siempreviva"},
+            "edad": 10,
+        }
+
+    def test_no_puede_crear_hijo_sin_consentimiento(self):
+        url = reverse("tutor-hijos", kwargs={"pk": self.tutor.id})
+        res = self.client.post(url, self._body(), format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("consentimiento", res.data)
+        self.assertEqual(Paciente.objects.count(), 0)
+
+    def test_puede_crear_hijo_con_consentimiento(self):
+        self.tutor.consentimiento_aceptado = True
+        self.tutor.save()
+        url = reverse("tutor-hijos", kwargs={"pk": self.tutor.id})
+        res = self.client.post(url, self._body(), format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)

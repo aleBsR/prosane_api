@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.antecedentes.models import AntecedenteFamiliar, AntecedentePersonal
+from apps.antecedentes.models import AntecedenteFamiliar, AntecedenteFamiliarTutor, AntecedentePersonal
 from apps.pacientes.models import Paciente
 from apps.personas.models import Domicilio, Persona
 from apps.tutores.models import Tutor
@@ -66,13 +66,6 @@ class AntecedenteFamiliarInputSerializer(serializers.ModelSerializer):
         exclude = _AUDIT_FIELDS
 
 
-class ConsentimientoInputSerializer(serializers.Serializer):
-    adulto_nombre = serializers.CharField()
-    adulto_apellido = serializers.CharField()
-    adulto_tipo_documento = serializers.CharField()
-    adulto_dni = serializers.CharField()
-
-
 class HijoCreateSerializer(serializers.Serializer):
     """Serializer de entrada para crear un hijo (Paciente)."""
 
@@ -84,8 +77,6 @@ class HijoCreateSerializer(serializers.Serializer):
     nombre_cobertura = serializers.CharField(required=False, allow_blank=True)
     parentesco = serializers.CharField(required=False, allow_blank=True)
     antecedentes_personales = AntecedentePersonalInputSerializer(required=False)
-    antecedentes_familiares = AntecedenteFamiliarInputSerializer(required=False)
-    consentimiento = ConsentimientoInputSerializer(required=False)
 
     def validate(self, attrs):
         dni = attrs.get("persona", {}).get("dni")
@@ -114,6 +105,7 @@ class HijoOutputSerializer(serializers.ModelSerializer):
 
     persona = PersonaOutputSerializer(read_only=True)
     domicilio = DomicilioOutputSerializer(read_only=True)
+    adulto = serializers.SerializerMethodField()
 
     class Meta:
         model = Paciente
@@ -121,8 +113,32 @@ class HijoOutputSerializer(serializers.ModelSerializer):
             "id", "persona", "domicilio", "tutor", "edad",
             "tiene_cud", "tipo_cobertura", "nombre_cobertura",
             "consentimiento_aceptado", "fecha_consentimiento",
-            "adulto_nombre", "adulto_apellido", "adulto_tipo_documento",
+            "adulto",
         ]
+
+    def get_adulto(self, obj):
+        return obj.adulto
+
+
+class TutorConsentimientoOutputSerializer(serializers.ModelSerializer):
+    """Serializer de salida del consentimiento del tutor."""
+
+    class Meta:
+        model = Tutor
+        fields = ["id", "consentimiento_aceptado", "fecha_consentimiento"]
+
+
+class AntecedenteFamiliarTutorSerializer(serializers.ModelSerializer):
+    """Serializer de entrada/salida de antecedentes familiares del tutor."""
+
+    class Meta:
+        model = AntecedenteFamiliarTutor
+        fields = [
+            "id", "tutor",
+            "problema_salud_importante", "problema_salud_cual",
+            "muerte_subita_familiar",
+        ]
+        read_only_fields = ["id", "tutor"]
 
 
 class TutorOutputSerializer(serializers.ModelSerializer):

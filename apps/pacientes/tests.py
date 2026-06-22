@@ -25,10 +25,10 @@ class PacienteConsentimientoTest(TestCase):
             persona=nna, domicilio=dom, tutor=tutor, edad=9,
             consentimiento_aceptado=True,
             fecha_consentimiento=timezone.now(),
-            adulto_nombre="Marta", adulto_apellido="Tutora",
-            adulto_tipo_documento="DNI", adulto_dni="30000000",
         )
         p.refresh_from_db()
         self.assertTrue(p.consentimiento_aceptado)
         self.assertIsNotNone(p.fecha_consentimiento)
-        self.assertEqual(p.adulto_dni, "30000000")
+        self.assertEqual(p.adulto["dni"], "30000000")
+        self.assertEqual(p.adulto["nombre"], "Marta")
+        self.assertEqual(p.adulto["apellido"], "Tutora")

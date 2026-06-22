@@ -77,7 +77,7 @@ class SeedPermissionsTest(TestCase):
 
         call_command("seed_permissions", verbosity=0)
 
-        self.assertEqual(Action.objects.filter(is_active=True).count(), 15)
+        self.assertEqual(Action.objects.filter(is_active=True).count(), 17)
         self.assertTrue(Rol.objects.filter(rol="ayudante").exists())
         self.assertTrue(ActionRole.objects.filter(role__rol="ayudante").exists())
 
@@ -213,7 +213,10 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
     def test_me_tutor_ve_escuelas_y_familia(self):
         user = Usuario.objects.get(email="tutor@prosane.test")
         actions = self._action_names(user)
-        self.assertEqual(actions, {"verEscuelas", "registrarHijo", "verHijos"})
+        self.assertEqual(actions, {
+            "verEscuelas", "registrarHijo", "verHijos",
+            "darConsentimiento", "cargarAntecedentesFamiliares",
+        })
 
     def test_me_medico_solo_ve_operativo(self):
         user = Usuario.objects.get(email="medico@prosane.test")
@@ -230,6 +233,7 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
             "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
             "gestionarEstadoAlumnoEnOperativo",
             "registrarHijo", "verHijos",
+            "darConsentimiento", "cargarAntecedentesFamiliares",
         })
 
 

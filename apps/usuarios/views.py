@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
+from apps.antecedentes.models import AntecedenteFamiliarTutor
 from apps.tutores.models import Tutor
 from apps.usuarios.action_resolution import effective_actions
 
@@ -43,6 +44,10 @@ class MeView(APIView):
         user = request.user
         persona = getattr(user, "persona", None)
         tutor = Tutor.objects.filter(usuario=user).first()
+        antecedentes_completos = False
+        if tutor:
+            antecedentes_completos = AntecedenteFamiliarTutor.objects.filter(tutor=tutor).exists()
+
         roles = [
             {"name": r.rol, "label": r.rol.capitalize()}
             for r in user.roles.all()
@@ -55,6 +60,8 @@ class MeView(APIView):
                 "apellido": getattr(persona, "apellido", "") or "",
                 "is_staff": user.is_staff,
                 "tutor_id": str(tutor.id) if tutor else None,
+                "consentimiento_aceptado": tutor.consentimiento_aceptado if tutor else False,
+                "antecedentes_familiares_completos": antecedentes_completos,
             },
             "roles": roles,
             "actions": effective_actions(user),
