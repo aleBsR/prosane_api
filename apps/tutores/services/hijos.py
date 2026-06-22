@@ -44,8 +44,11 @@ def crear_hijo(tutor_id, data, requiere_consentimiento=True):
             field="consentimiento",
         )
 
-    persona_data = data.get("persona", {})
+    persona_data = dict(data.get("persona", {}))
     _validar_dni_unico(persona_data.get("dni"))
+
+    telefono_fijo = persona_data.pop("telefono_fijo", None) or None
+    celular = persona_data.pop("celular", None) or None
 
     ant_personales = data.get("antecedentes_personales") or {}
     parentesco = data.get("parentesco")
@@ -61,6 +64,8 @@ def crear_hijo(tutor_id, data, requiere_consentimiento=True):
             tiene_cud=data.get("tiene_cud"),
             tipo_cobertura=data.get("tipo_cobertura"),
             nombre_cobertura=data.get("nombre_cobertura"),
+            telefono_fijo=telefono_fijo,
+            celular=celular,
         )
         AntecedentePersonal.objects.create(paciente=paciente, **ant_personales)
 

@@ -26,6 +26,8 @@ class Paciente(BaseModel):
 
     consentimiento_aceptado = models.BooleanField(default=False)
     fecha_consentimiento = models.DateTimeField(null=True, blank=True)
+    telefono_fijo = models.CharField(max_length=20, blank=True, null=True)
+    celular = models.CharField(max_length=20, blank=True, null=True)
 
     class Meta:
         managed = True
