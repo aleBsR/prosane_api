@@ -120,8 +120,8 @@ class TutorHijosAPITest(APITestCase):
     def test_crear_hijo_con_telefonos(self):
         self.client.force_authenticate(user=self.usuario_tutor)
         payload = self._hijo_payload()
-        payload["persona"]["telefono_fijo"] = "0387-4211111"
-        payload["persona"]["celular"] = "+54 9 387 555 5555"
+        payload["telefono_fijo"] = "0387-4211111"
+        payload["celular"] = "+54 9 387 555 5555"
 
         url = reverse("tutor-hijos", kwargs={"pk": str(self.tutor.id)})
         res = self.client.post(url, payload, format="json")

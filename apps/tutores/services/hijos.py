@@ -47,8 +47,8 @@ def crear_hijo(tutor_id, data, requiere_consentimiento=True):
     persona_data = dict(data.get("persona", {}))
     _validar_dni_unico(persona_data.get("dni"))
 
-    telefono_fijo = persona_data.pop("telefono_fijo", None) or None
-    celular = persona_data.pop("celular", None) or None
+    telefono_fijo = data.get("telefono_fijo") or None
+    celular = data.get("celular") or None
 
     ant_personales = data.get("antecedentes_personales") or {}
     parentesco = data.get("parentesco")

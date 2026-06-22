@@ -9,15 +9,9 @@ from apps.tutores.models import Tutor
 class PersonaInputSerializer(serializers.ModelSerializer):
     """Serializer de entrada para datos de Persona."""
 
-    telefono_fijo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    celular = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-
     class Meta:
         model = Persona
-        fields = [
-            "nombre", "apellido", "dni", "tipo_dni", "sexo", "fecha_nacimiento",
-            "telefono_fijo", "celular",
-        ]
+        fields = ["nombre", "apellido", "dni", "tipo_dni", "sexo", "fecha_nacimiento"]
 
 
 class DomicilioInputSerializer(serializers.ModelSerializer):
@@ -81,6 +75,8 @@ class HijoCreateSerializer(serializers.Serializer):
     tiene_cud = serializers.CharField(required=False, allow_blank=True)
     tipo_cobertura = serializers.CharField(required=False, allow_blank=True)
     nombre_cobertura = serializers.CharField(required=False, allow_blank=True)
+    telefono_fijo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    celular = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     parentesco = serializers.CharField(required=False, allow_blank=True)
     antecedentes_personales = AntecedentePersonalInputSerializer(required=False)
 
