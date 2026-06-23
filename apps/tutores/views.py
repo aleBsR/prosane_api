@@ -4,6 +4,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from apps.usuarios.permissions import require_action
+from apps.antecedentes.models import AntecedentePersonal
+from apps.antecedentes.serializers import AntecedentespersonalesSerializer
+from apps.pacientes.models import Paciente
 from apps.tutores.serializers import (
     AntecedenteFamiliarTutorSerializer,
     HijoCreateSerializer,
@@ -11,12 +14,14 @@ from apps.tutores.serializers import (
     TutorConsentimientoOutputSerializer,
     TutorRegistrationSerializer,
 )
+from apps.tutores.services.antecedentes_nino import AntecedenteNinoError, upsert_antecedentes_nino
 from apps.tutores.services.hijos import HijosError, crear_hijo, listar_hijos
 from apps.tutores.services.perfil_tutor import (
     TutorProfileError,
     aceptar_consentimiento,
     actualizar_antecedente_familiar,
     obtener_o_crear_antecedente_familiar,
+    verificar_pertenencia_tutor,
 )
 from apps.tutores.services.registration import TutorRegistrationError, registrar_tutor
 
@@ -151,3 +156,60 @@ class TutorAntecedentesFamiliaresView(APIView):
 
         output = AntecedenteFamiliarTutorSerializer(antecedente)
         return Response(output.data, status=status.HTTP_200_OK)
+
+
+class TutorAntecedentesNinoView(APIView):
+    """
+    GET/POST /api/v1/tutores/<uuid:pk>/hijos/<uuid:paciente_id>/antecedentes-personales/
+    Gestión de antecedentes de salud del niño (del paciente).
+    """
+
+    permission_classes = [require_action("cargarAntecedentesNino")]
+
+    def get(self, request, pk, paciente_id):
+        try:
+            tutor = verificar_pertenencia_tutor(pk, request.user)
+        except AntecedenteNinoError as exc:
+            return Response(
+                {exc.field or "detail": exc.message},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            antecedente = AntecedentePersonal.objects.get(paciente_id=paciente_id)
+            paciente = antecedente.paciente
+            if paciente.tutor_id != tutor.id:
+                return Response(
+                    {"detail": "No tenés permiso para acceder a este paciente."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        except AntecedentePersonal.DoesNotExist:
+            # Crear con defaults si no existe
+            try:
+                paciente = Paciente.objects.get(id=paciente_id)
+                if paciente.tutor_id != tutor.id:
+                    return Response(
+                        {"detail": "No tenés permiso para acceder a este paciente."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+                antecedente = AntecedentePersonal.objects.create(paciente=paciente)
+            except Paciente.DoesNotExist:
+                return Response(
+                    {"detail": "Paciente no encontrado."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        serializer = AntecedentespersonalesSerializer(antecedente)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, pk, paciente_id):
+        try:
+            antecedente = upsert_antecedentes_nino(pk, paciente_id, request.user, request.data)
+            serializer = AntecedentespersonalesSerializer(antecedente)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except AntecedenteNinoError as exc:
+            status_code = status.HTTP_403_FORBIDDEN if "permiso" in exc.message.lower() else status.HTTP_404_NOT_FOUND
+            return Response(
+                {exc.field or "detail": exc.message},
+                status=status_code,
+            )

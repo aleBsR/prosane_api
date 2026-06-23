@@ -146,6 +146,22 @@
   {
     "model": "usuarios.action",
     "fields": {
+      "name": "iniciarOperativo",
+      "label": "Iniciar operativo",
+      "icon": "play_arrow",
+      "color": "#2196F3",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": false,
+      "sort_order": 25,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
       "name": "cancelarOperativo",
       "label": "Cancelar operativo",
       "icon": "cancel",
@@ -153,7 +169,7 @@
       "type": "action",
       "category": "operativos",
       "is_sensitive": true,
-      "sort_order": 25,
+      "sort_order": 26,
       "is_active": true,
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
@@ -169,7 +185,7 @@
       "type": "action",
       "category": "operativos",
       "is_sensitive": true,
-      "sort_order": 26,
+      "sort_order": 27,
       "is_active": true,
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
@@ -185,7 +201,7 @@
       "type": "action",
       "category": "operativos",
       "is_sensitive": true,
-      "sort_order": 27,
+      "sort_order": 28,
       "is_active": true,
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
@@ -201,7 +217,7 @@
       "type": "action",
       "category": "operativos",
       "is_sensitive": false,
-      "sort_order": 28,
+      "sort_order": 29,
       "is_active": true,
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
@@ -266,6 +282,22 @@
       "category": "familia",
       "is_sensitive": true,
       "sort_order": 53,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cargarAntecedentesNino",
+      "label": "Cargar antecedentes de salud del niño/a",
+      "icon": "medical_information",
+      "color": "#6A4C93",
+      "type": "action",
+      "category": "familia",
+      "is_sensitive": true,
+      "sort_order": 54,
       "is_active": true,
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
