@@ -226,6 +226,54 @@
   {
     "model": "usuarios.action",
     "fields": {
+      "name": "cargarEvaluacionMedica",
+      "label": "Cargar evaluación médica",
+      "icon": "medical_services",
+      "color": "#6A1B9A",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 30,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cargarEvaluacionOdontologica",
+      "label": "Cargar evaluación odontológica",
+      "icon": "dentistry",
+      "color": "#6A1B9A",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 31,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cargarSeccionEscuela",
+      "label": "Cargar sección escuela",
+      "icon": "school",
+      "color": "#1565C0",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": false,
+      "sort_order": 32,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
       "name": "registrarHijo",
       "label": "Registrar hijo",
       "icon": "person_add",

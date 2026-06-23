@@ -20,10 +20,14 @@ ROLE_ACTIONS = {
         "verOperativo", "crearOperativo", "editarOperativo",
         "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
         "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
-        "gestionarEstadoAlumnoEnOperativo",
+        "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
     ],
-    "medico": ["verOperativo", "gestionarEstadoAlumnoEnOperativo"],
-    "odontologo": ["verOperativo", "gestionarEstadoAlumnoEnOperativo"],
+    "medico": [
+        "verOperativo", "gestionarEstadoAlumnoEnOperativo", "cargarEvaluacionMedica",
+    ],
+    "odontologo": [
+        "verOperativo", "gestionarEstadoAlumnoEnOperativo", "cargarEvaluacionOdontologica",
+    ],
     "tutor": [
         "verEscuelas", "registrarHijo", "verHijos",
         "darConsentimiento", "cargarAntecedentesFamiliares", "cargarAntecedentesNino",

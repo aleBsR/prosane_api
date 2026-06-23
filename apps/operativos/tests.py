@@ -10,7 +10,10 @@ from rest_framework.test import APITestCase
 
 from apps.escuelas.models import Escuela, Curso
 from apps.usuarios.models import Usuario
-from apps.operativos.models import Operativo, OperativoProfesional, OperativoAlumno
+from apps.operativos.models import (
+    Operativo, OperativoProfesional, OperativoAlumno,
+    EvaluacionMedica, EvaluacionOdontologica,
+)
 from apps.operativos import services
 
 
@@ -62,6 +65,19 @@ def _create_operativo(escuela, **kwargs):
     defaults = {'fecha': date(2026, 6, 20)}
     defaults.update(kwargs)
     return services.crear_operativo(escuela.id, **defaults)
+
+
+def _completar_alumno(alumno):
+    """Deja un alumno completo: evaluaciones cargadas + sección escuela."""
+    EvaluacionMedica.objects.update_or_create(
+        operativo_alumno=alumno, defaults={'completada': True},
+    )
+    EvaluacionOdontologica.objects.update_or_create(
+        operativo_alumno=alumno, defaults={'completada': True},
+    )
+    alumno.escuela_completado = True
+    alumno.estado = OperativoAlumno.EVALUADO
+    alumno.save()
 
 
 def _asignar_rol(usuario, rol_nombre):
@@ -145,6 +161,98 @@ class OperativoAlumnoModelTest(TestCase):
         self.assertIn('García', str(alumno))
         self.assertIn('Juan', str(alumno))
         self.assertIn('12345678', str(alumno))
+
+
+# ──────────────────────────────────────────────
+#  Tests de modelos de evaluación clínica (Fase 1)
+# ──────────────────────────────────────────────
+class EvaluacionModelTest(TestCase):
+    def setUp(self):
+        self.escuela = _create_escuela()
+        self.operativo = _create_operativo(self.escuela)
+        self.alumno = OperativoAlumno.objects.create(
+            operativo=self.operativo,
+            apellido='Pérez', nombre='Ana', dni='30111222',
+        )
+        self.medico = _create_medico()
+        self.odontologo = _create_odontologo()
+
+    def test_crear_evaluacion_medica(self):
+        ev = EvaluacionMedica.objects.create(
+            operativo_alumno=self.alumno,
+            profesional=self.medico,
+        )
+        self.assertEqual(ev.operativo_alumno, self.alumno)
+        self.assertEqual(ev.profesional, self.medico)
+        # Acceso vía related_name OneToOne
+        self.assertEqual(self.alumno.evaluacion_medica, ev)
+        self.assertFalse(ev.completada)
+        self.assertFalse(ev.examen_realizado)
+
+    def test_crear_evaluacion_odontologica(self):
+        ev = EvaluacionOdontologica.objects.create(
+            operativo_alumno=self.alumno,
+            profesional=self.odontologo,
+        )
+        self.assertEqual(ev.operativo_alumno, self.alumno)
+        self.assertEqual(ev.profesional, self.odontologo)
+        self.assertEqual(self.alumno.evaluacion_odontologica, ev)
+        self.assertFalse(ev.completada)
+
+    def test_jsonfields_default_dict_vacio_medica(self):
+        ev = EvaluacionMedica.objects.create(operativo_alumno=self.alumno)
+        ev.refresh_from_db()
+        self.assertEqual(ev.hallazgos, {})
+        self.assertEqual(ev.derivaciones, {})
+
+    def test_jsonfield_default_dict_vacio_odontologica(self):
+        ev = EvaluacionOdontologica.objects.create(operativo_alumno=self.alumno)
+        ev.refresh_from_db()
+        self.assertEqual(ev.odontograma, {})
+
+    def test_jsonfields_persisten_datos(self):
+        ev = EvaluacionMedica.objects.create(
+            operativo_alumno=self.alumno,
+            hallazgos={'piel': {'estado': 'sin', 'detalle': ''}},
+            derivaciones={'odontologia': {'deriva': True, 'motivo': 'caries'}},
+        )
+        ev.refresh_from_db()
+        self.assertEqual(ev.hallazgos['piel']['estado'], 'sin')
+        self.assertTrue(ev.derivaciones['odontologia']['deriva'])
+
+    def test_onetoone_evita_duplicados(self):
+        from django.db import IntegrityError, transaction
+        EvaluacionMedica.objects.create(operativo_alumno=self.alumno)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                EvaluacionMedica.objects.create(operativo_alumno=self.alumno)
+
+
+class OperativoAlumnoEscuelaFieldsTest(TestCase):
+    def test_campos_escuela_existen(self):
+        campos = {f.name for f in OperativoAlumno._meta.get_fields()}
+        for nombre in (
+            'escuela_preocupa_salud',
+            'escuela_preocupa_detalle',
+            'escuela_dificultad_lenguaje',
+            'escuela_bajo_tratamiento',
+            'escuela_completado',
+        ):
+            self.assertIn(nombre, campos)
+
+    def test_defaults_campos_escuela(self):
+        escuela = _create_escuela()
+        operativo = _create_operativo(escuela)
+        alumno = OperativoAlumno.objects.create(
+            operativo=operativo,
+            apellido='López', nombre='Luis', dni='40555666',
+        )
+        alumno.refresh_from_db()
+        self.assertFalse(alumno.escuela_preocupa_salud)
+        self.assertEqual(alumno.escuela_preocupa_detalle, '')
+        self.assertFalse(alumno.escuela_dificultad_lenguaje)
+        self.assertFalse(alumno.escuela_bajo_tratamiento)
+        self.assertFalse(alumno.escuela_completado)
 
 
 # ──────────────────────────────────────────────
@@ -259,8 +367,7 @@ class ServiciosTest(TestCase):
         )
         services.confirmar_operativo(op.id)
         services.transicionar_estado(op.id, Operativo.EN_CURSO)
-        alumno.estado = OperativoAlumno.EVALUADO
-        alumno.save()
+        _completar_alumno(alumno)
         op = services.finalizar_operativo(op.id)
         self.assertEqual(op.estado, Operativo.FINALIZADO)
 
@@ -287,8 +394,7 @@ class ServiciosTest(TestCase):
         )
         services.confirmar_operativo(op.id)
         services.transicionar_estado(op.id, Operativo.EN_CURSO)
-        alumno.estado = OperativoAlumno.EVALUADO
-        alumno.save()
+        _completar_alumno(alumno)
         services.finalizar_operativo(op.id)
         with self.assertRaises(ValueError):
             services.cancelar_operativo(op.id)
@@ -297,6 +403,81 @@ class ServiciosTest(TestCase):
         op = _create_operativo(self.escuela)
         with self.assertRaises(ValueError):
             services.transicionar_estado(op.id, Operativo.FINALIZADO)
+
+
+# ──────────────────────────────────────────────
+#  Tests de completitud y gating (Fase 3)
+# ──────────────────────────────────────────────
+class CompletitudTest(TestCase):
+    def setUp(self):
+        self.escuela = _create_escuela()
+        self.medico = _create_medico()
+
+    def _operativo_en_curso(self):
+        op = _create_operativo(self.escuela)
+        services.asignar_profesional(op.id, self.medico.id, 'medico')
+        alumno = OperativoAlumno.objects.create(
+            operativo=op, apellido='García', nombre='Juan', dni='12345678',
+        )
+        services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
+        return op, alumno
+
+    def test_alumno_ausente_es_completo(self):
+        op, alumno = self._operativo_en_curso()
+        alumno.estado = OperativoAlumno.AUSENTE
+        alumno.save()
+        self.assertTrue(alumno.completo)
+
+    def test_alumno_sin_evaluaciones_no_es_completo(self):
+        op, alumno = self._operativo_en_curso()
+        self.assertFalse(alumno.completo)
+
+    def test_alumno_solo_medica_no_es_completo(self):
+        op, alumno = self._operativo_en_curso()
+        EvaluacionMedica.objects.create(operativo_alumno=alumno, completada=True)
+        alumno.escuela_completado = True
+        alumno.save()
+        self.assertFalse(alumno.completo)
+
+    def test_alumno_evaluaciones_no_completadas_no_es_completo(self):
+        op, alumno = self._operativo_en_curso()
+        EvaluacionMedica.objects.create(operativo_alumno=alumno, completada=False)
+        EvaluacionOdontologica.objects.create(operativo_alumno=alumno, completada=False)
+        alumno.escuela_completado = True
+        alumno.save()
+        self.assertFalse(alumno.completo)
+
+    def test_alumno_completo_con_todo(self):
+        op, alumno = self._operativo_en_curso()
+        _completar_alumno(alumno)
+        self.assertTrue(alumno.completo)
+
+    def test_operativo_sin_alumnos_no_puede_finalizar(self):
+        op = _create_operativo(self.escuela)
+        self.assertFalse(op.puede_finalizar)
+
+    def test_operativo_no_puede_finalizar_si_falta_evaluacion(self):
+        op, alumno = self._operativo_en_curso()
+        self.assertFalse(op.puede_finalizar)
+        with self.assertRaises(ValueError):
+            services.finalizar_operativo(op.id)
+
+    def test_operativo_puede_finalizar_todos_completos(self):
+        op, alumno = self._operativo_en_curso()
+        _completar_alumno(alumno)
+        self.assertTrue(op.puede_finalizar)
+        op = services.finalizar_operativo(op.id)
+        self.assertEqual(op.estado, Operativo.FINALIZADO)
+
+    def test_operativo_puede_finalizar_mezcla_completos_y_ausentes(self):
+        op, alumno = self._operativo_en_curso()
+        _completar_alumno(alumno)
+        ausente = OperativoAlumno.objects.create(
+            operativo=op, apellido='Pérez', nombre='Ana', dni='99999999',
+            estado=OperativoAlumno.AUSENTE,
+        )
+        self.assertTrue(op.puede_finalizar)
 
 
 # ──────────────────────────────────────────────
@@ -371,8 +552,7 @@ class ImportarCSVTest(TestCase):
         )
         services.confirmar_operativo(op.id)
         services.transicionar_estado(op.id, Operativo.EN_CURSO)
-        alumno.estado = OperativoAlumno.EVALUADO
-        alumno.save()
+        _completar_alumno(alumno)
         services.finalizar_operativo(op.id)
         csv_file = self._make_csv([
             {'apellido': 'Nuevo', 'nombre': 'Test', 'tipo_dni': 'DNI', 'dni': '11111111', 'fecha_nacimiento': '', 'sexo': ''},
@@ -534,8 +714,7 @@ class OperativoAPITest(APITestCase):
         alumno = self._create_alumno(op)
         services.confirmar_operativo(op.id)
         services.transicionar_estado(op.id, Operativo.EN_CURSO)
-        alumno.estado = OperativoAlumno.EVALUADO
-        alumno.save()
+        _completar_alumno(alumno)
         response = self.client.post(f'/api/v1/operativos/{op.id}/finalizar/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['estado'], Operativo.FINALIZADO)
@@ -741,3 +920,40 @@ class OperativoAPITest(APITestCase):
             f'/api/v1/operativos/{op.id}/profesionales/{rel.id}/remover/',
         )
         self.assertEqual(response.status_code, 409)
+
+    # ─── Completitud / gating (Fase 3) ───
+    def test_finalizar_devuelve_409_si_falta_evaluacion(self):
+        op = self._create_operativo()
+        services.asignar_profesional(op.id, self.medico.id, 'medico')
+        self._create_alumno(op)
+        services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
+        response = self.client.post(f'/api/v1/operativos/{op.id}/finalizar/')
+        self.assertEqual(response.status_code, 409)
+
+    def test_completitud_endpoint_pendiente(self):
+        op = self._create_operativo()
+        services.asignar_profesional(op.id, self.medico.id, 'medico')
+        self._create_alumno(op)
+        services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
+        response = self.client.get(f'/api/v1/operativos/{op.id}/completitud/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['total_alumnos'], 1)
+        self.assertEqual(response.data['completos'], 0)
+        self.assertEqual(response.data['pendientes'], 1)
+        self.assertFalse(response.data['puede_finalizar'])
+
+    def test_completitud_endpoint_completo(self):
+        op = self._create_operativo()
+        services.asignar_profesional(op.id, self.medico.id, 'medico')
+        alumno = self._create_alumno(op)
+        services.confirmar_operativo(op.id)
+        services.transicionar_estado(op.id, Operativo.EN_CURSO)
+        _completar_alumno(alumno)
+        response = self.client.get(f'/api/v1/operativos/{op.id}/completitud/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['total_alumnos'], 1)
+        self.assertEqual(response.data['completos'], 1)
+        self.assertEqual(response.data['pendientes'], 0)
+        self.assertTrue(response.data['puede_finalizar'])
