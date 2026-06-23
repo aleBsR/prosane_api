@@ -148,14 +148,8 @@ def finalizar_operativo(operativo_id):
             f'(estado actual: {operativo.estado})'
         )
 
-    no_evaluados = operativo.alumnos.exclude(
-        estado__in=[OperativoAlumno.AUSENTE, OperativoAlumno.EVALUADO],
-    )
-    if no_evaluados.exists():
-        raise ValueError(
-            f'Todos los alumnos deben estar evaluados o ausentes. '
-            f'{no_evaluados.count()} alumnos pendientes.'
-        )
+    if not operativo.puede_finalizar:
+        raise ValueError('No se puede finalizar: faltan evaluaciones de alumnos')
 
     return transicionar_estado(operativo_id, Operativo.FINALIZADO)
 

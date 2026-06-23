@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Operativo, OperativoProfesional, OperativoAlumno
+from .models import (
+    Operativo, OperativoProfesional, OperativoAlumno,
+    EvaluacionMedica, EvaluacionOdontologica,
+)
 
 
 class OperativoProfesionalSerializer(serializers.ModelSerializer):
@@ -57,17 +60,77 @@ class OperativoDetailSerializer(serializers.ModelSerializer):
 
 
 class OperativoAlumnoSerializer(serializers.ModelSerializer):
+    completo = serializers.BooleanField(read_only=True)
+    medica_completada = serializers.SerializerMethodField(read_only=True)
+    odontologica_completada = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = OperativoAlumno
         fields = [
             'id', 'operativo', 'paciente', 'curso',
             'apellido', 'nombre', 'tipo_dni', 'dni',
             'fecha_nacimiento', 'sexo', 'estado', 'observaciones',
+            'completo', 'medica_completada', 'odontologica_completada',
+            'escuela_completado',
         ]
         read_only_fields = ['id', 'operativo']
+
+    def get_medica_completada(self, obj):
+        try:
+            return obj.evaluacion_medica.completada
+        except (OperativoAlumno.evaluacion_medica.RelatedObjectDoesNotExist, AttributeError):
+            return False
+
+    def get_odontologica_completada(self, obj):
+        try:
+            return obj.evaluacion_odontologica.completada
+        except (OperativoAlumno.evaluacion_odontologica.RelatedObjectDoesNotExist, AttributeError):
+            return False
 
 
 class OperativoAlumnoEstadoSerializer(serializers.ModelSerializer):
     class Meta:
         model = OperativoAlumno
         fields = ['estado', 'observaciones']
+
+
+class EvaluacionMedicaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EvaluacionMedica
+        fields = [
+            'id', 'operativo_alumno', 'profesional', 'fecha_evaluacion',
+            'examen_realizado', 'motivo_no_examen', 'lugar_examen',
+            'trajo_carnet', 'carnet_completo', 'vacunas_aplicadas', 'vacunas_indicadas',
+            'peso', 'talla', 'imc', 'percentil_talla', 'percentil_imc',
+            'pas', 'pad', 'presion_clasificacion',
+            'agudeza_evaluada', 'ojo_derecho', 'ojo_izquierdo', 'usa_lentes',
+            'audiometria_realizada', 'audiometria_resultado',
+            'hallazgos', 'derivaciones',
+            'completada',
+        ]
+        read_only_fields = ['id', 'operativo_alumno', 'profesional', 'fecha_evaluacion']
+
+
+class EvaluacionOdontologicaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EvaluacionOdontologica
+        fields = [
+            'id', 'operativo_alumno', 'profesional', 'fecha_evaluacion',
+            'salud_bucal', 'lesiones_tejidos_blandos', 'maloclusion',
+            'fluorosis', 'caries', 'otros',
+            'topicacion_fluor', 'ensenanza_cepillado', 'alta_basica',
+            'cpo_c', 'cpo_p', 'cpo_o', 'ceo_c', 'ceo_e', 'ceo_o',
+            'odontograma',
+            'completada',
+        ]
+        read_only_fields = ['id', 'operativo_alumno', 'profesional', 'fecha_evaluacion']
+
+
+class SeccionEscuelaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OperativoAlumno
+        fields = [
+            'escuela_preocupa_salud', 'escuela_preocupa_detalle',
+            'escuela_dificultad_lenguaje', 'escuela_bajo_tratamiento',
+            'escuela_completado',
+        ]

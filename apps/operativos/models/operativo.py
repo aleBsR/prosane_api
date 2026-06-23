@@ -48,3 +48,11 @@ class Operativo(BaseModel):
 
     def __str__(self):
         return f'{self.nombre or self.escuela.nombre} - {self.fecha} ({self.get_estado_display()})'
+
+    @property
+    def puede_finalizar(self):
+        """True si hay al menos un alumno y todos están completos."""
+        alumnos = list(self.alumnos.all())
+        if not alumnos:
+            return False
+        return all(alumno.completo for alumno in alumnos)

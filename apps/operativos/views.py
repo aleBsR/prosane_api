@@ -1,15 +1,22 @@
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from apps.usuarios.permissions import require_action
-from .models import Operativo, OperativoProfesional, OperativoAlumno
+from .models import (
+    Operativo, OperativoProfesional, OperativoAlumno,
+    EvaluacionMedica, EvaluacionOdontologica,
+)
 from .serializers import (
     OperativoListSerializer,
     OperativoDetailSerializer,
     OperativoProfesionalSerializer,
     OperativoAlumnoSerializer,
     OperativoAlumnoEstadoSerializer,
+    EvaluacionMedicaSerializer,
+    EvaluacionOdontologicaSerializer,
+    SeccionEscuelaSerializer,
 )
 from . import queries, services
 
@@ -280,3 +287,119 @@ class OperativoAlumnoImportCSVView(APIView):
             return Response(resultado)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
+
+
+# ──────────────────────────────────────────────
+#  Evaluación clínica por alumno
+# ──────────────────────────────────────────────
+class EvaluacionMedicaView(APIView):
+    permission_classes = [require_action('cargarEvaluacionMedica')]
+    rol_requerido = 'medico'
+
+    def _get_alumno(self, request, pk, alumno_pk):
+        operativo = queries.obtener_operativo_visible(request.user, pk)
+        alumno = OperativoAlumno.objects.get(operativo=operativo, pk=alumno_pk)
+        return operativo, alumno
+
+    def _profesional_asignado(self, operativo, user):
+        return OperativoProfesional.objects.filter(
+            operativo=operativo, profesional=user, rol_en_operativo=self.rol_requerido,
+        ).exists()
+
+    def get(self, request, pk, alumno_pk):
+        operativo, alumno = self._get_alumno(request, pk, alumno_pk)
+        if not self._profesional_asignado(operativo, request.user):
+            return Response(
+                {'error': f'No estás asignado a este operativo como {self.rol_requerido}'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        evaluacion, _ = EvaluacionMedica.objects.get_or_create(operativo_alumno=alumno)
+        return Response(EvaluacionMedicaSerializer(evaluacion).data)
+
+    def put(self, request, pk, alumno_pk):
+        operativo, alumno = self._get_alumno(request, pk, alumno_pk)
+        if not self._profesional_asignado(operativo, request.user):
+            return Response(
+                {'error': f'No estás asignado a este operativo como {self.rol_requerido}'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        evaluacion, _ = EvaluacionMedica.objects.get_or_create(operativo_alumno=alumno)
+        serializer = EvaluacionMedicaSerializer(evaluacion, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(
+            profesional=request.user,
+            fecha_evaluacion=timezone.now(),
+            completada=True,
+        )
+        return Response(serializer.data)
+
+
+class EvaluacionOdontologicaView(APIView):
+    permission_classes = [require_action('cargarEvaluacionOdontologica')]
+    rol_requerido = 'odontologo'
+
+    def _get_alumno(self, request, pk, alumno_pk):
+        operativo = queries.obtener_operativo_visible(request.user, pk)
+        alumno = OperativoAlumno.objects.get(operativo=operativo, pk=alumno_pk)
+        return operativo, alumno
+
+    def _profesional_asignado(self, operativo, user):
+        return OperativoProfesional.objects.filter(
+            operativo=operativo, profesional=user, rol_en_operativo=self.rol_requerido,
+        ).exists()
+
+    def get(self, request, pk, alumno_pk):
+        operativo, alumno = self._get_alumno(request, pk, alumno_pk)
+        if not self._profesional_asignado(operativo, request.user):
+            return Response(
+                {'error': f'No estás asignado a este operativo como {self.rol_requerido}'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        evaluacion, _ = EvaluacionOdontologica.objects.get_or_create(operativo_alumno=alumno)
+        return Response(EvaluacionOdontologicaSerializer(evaluacion).data)
+
+    def put(self, request, pk, alumno_pk):
+        operativo, alumno = self._get_alumno(request, pk, alumno_pk)
+        if not self._profesional_asignado(operativo, request.user):
+            return Response(
+                {'error': f'No estás asignado a este operativo como {self.rol_requerido}'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        evaluacion, _ = EvaluacionOdontologica.objects.get_or_create(operativo_alumno=alumno)
+        serializer = EvaluacionOdontologicaSerializer(evaluacion, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(
+            profesional=request.user,
+            fecha_evaluacion=timezone.now(),
+            completada=True,
+        )
+        return Response(serializer.data)
+
+
+class OperativoCompletitudView(APIView):
+    """Resumen de completitud de alumnos de un operativo."""
+    permission_classes = [require_action('verOperativo')]
+
+    def get(self, request, pk):
+        operativo = queries.obtener_operativo_visible(request.user, pk)
+        alumnos = list(operativo.alumnos.all())
+        total = len(alumnos)
+        completos = sum(1 for a in alumnos if a.completo)
+        return Response({
+            'total_alumnos': total,
+            'completos': completos,
+            'pendientes': total - completos,
+            'puede_finalizar': operativo.puede_finalizar,
+        })
+
+
+class SeccionEscuelaView(APIView):
+    permission_classes = [require_action('cargarSeccionEscuela')]
+
+    def patch(self, request, pk, alumno_pk):
+        operativo = queries.obtener_operativo_visible(request.user, pk)
+        alumno = OperativoAlumno.objects.get(operativo=operativo, pk=alumno_pk)
+        serializer = SeccionEscuelaSerializer(alumno, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(escuela_completado=True)
+        return Response(serializer.data)
