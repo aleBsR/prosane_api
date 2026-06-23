@@ -3,8 +3,10 @@ from . import views
 
 urlpatterns = [
     path('', views.OperativoListCreateView.as_view(), name='operativo-list-create'),
+    path('profesionales-disponibles/', views.ProfesionalesDisponiblesView.as_view(), name='profesionales-disponibles'),
     path('<uuid:pk>/', views.OperativoDetailView.as_view(), name='operativo-detail'),
     path('<uuid:pk>/confirmar/', views.OperativoConfirmarView.as_view(), name='operativo-confirmar'),
+    path('<uuid:pk>/iniciar/', views.OperativoIniciarView.as_view(), name='operativo-iniciar'),
     path('<uuid:pk>/finalizar/', views.OperativoFinalizarView.as_view(), name='operativo-finalizar'),
     path('<uuid:pk>/cancelar/', views.OperativoCancelarView.as_view(), name='operativo-cancelar'),
     path('<uuid:pk>/profesionales/', views.OperativoProfesionalListView.as_view(), name='operativo-profesional-list'),

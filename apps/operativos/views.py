@@ -122,9 +122,49 @@ class OperativoCancelarView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
 
 
+class OperativoIniciarView(APIView):
+    permission_classes = [require_action('iniciarOperativo')]
+
+    def post(self, request, pk):
+        operativo = queries.obtener_operativo_visible(request.user, pk)
+        try:
+            op = services.iniciar_operativo(operativo.id)
+            serializer = OperativoDetailSerializer(op)
+            return Response(serializer.data)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
+
+
 # ──────────────────────────────────────────────
 #  Profesionales
 # ──────────────────────────────────────────────
+class ProfesionalesDisponiblesView(APIView):
+    """Lista los usuarios con rol médico u odontólogo, para asignarlos a un operativo."""
+    permission_classes = [require_action('gestionarProfesionalesEnOperativo')]
+
+    def get(self, request):
+        from apps.usuarios.models import Usuario
+        usuarios = (
+            Usuario.objects
+            .filter(roles__rol__in=['medico', 'odontologo'], is_active=True)
+            .prefetch_related('roles', 'persona')
+            .distinct()
+        )
+        data = []
+        for u in usuarios:
+            roles_prof = [r.rol for r in u.roles.all() if r.rol in ('medico', 'odontologo')]
+            nombre = u.persona.nombre if u.persona else ''
+            apellido = u.persona.apellido if u.persona else ''
+            data.append({
+                'id': str(u.id),
+                'email': u.email,
+                'nombre': nombre,
+                'apellido': apellido,
+                'roles': roles_prof,
+            })
+        return Response(data)
+
+
 class OperativoProfesionalListView(APIView):
     permission_classes = [require_action('verOperativo')]
 

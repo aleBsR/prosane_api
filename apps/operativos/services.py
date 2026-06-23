@@ -127,6 +127,16 @@ def confirmar_operativo(operativo_id):
 
 
 # ──────────────────────────────────────────────
+#  Iniciar
+# ──────────────────────────────────────────────
+def iniciar_operativo(operativo_id):
+    """
+    Transiciona un operativo de CONFIRMADO → EN_CURSO.
+    """
+    return transicionar_estado(operativo_id, Operativo.EN_CURSO)
+
+
+# ──────────────────────────────────────────────
 #  Finalizar
 # ──────────────────────────────────────────────
 def finalizar_operativo(operativo_id):

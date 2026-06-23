@@ -18,7 +18,7 @@ ROLE_ACTIONS = {
     "ayudante": [
         "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
         "verOperativo", "crearOperativo", "editarOperativo",
-        "confirmarOperativo", "finalizarOperativo", "cancelarOperativo",
+        "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
         "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
         "gestionarEstadoAlumnoEnOperativo",
     ],
@@ -26,7 +26,7 @@ ROLE_ACTIONS = {
     "odontologo": ["verOperativo", "gestionarEstadoAlumnoEnOperativo"],
     "tutor": [
         "verEscuelas", "registrarHijo", "verHijos",
-        "darConsentimiento", "cargarAntecedentesFamiliares",
+        "darConsentimiento", "cargarAntecedentesFamiliares", "cargarAntecedentesNino",
     ],
 }
 
