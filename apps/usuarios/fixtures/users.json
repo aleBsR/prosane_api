@@ -4,7 +4,7 @@
     "pk": "c0000000-0000-0000-0000-000000000001",
     "fields": {
       "email": "superadmin@prosane.test",
-      "password": "pbkdf2_sha256$1200000$TyMAm43smUi49Yb4motegc$arB3S9b2IHS8mlRGfMh3Jy27LI9Jez1PTR/KGLu4pro=",
+      "password": "pbkdf2_sha256$1200000$HyQh6FW1M7t0avyxLtXabP$AwI1VkH0NOFpWftkQ5jPuLhDdOKCZr0J8Cz7IBwi0tA=",
       "is_superuser": true,
       "is_staff": true,
       "is_active": true,
@@ -16,7 +16,7 @@
     "pk": "c0000000-0000-0000-0000-000000000002",
     "fields": {
       "email": "medico@prosane.test",
-      "password": "pbkdf2_sha256$1200000$TyMAm43smUi49Yb4motegc$arB3S9b2IHS8mlRGfMh3Jy27LI9Jez1PTR/KGLu4pro=",
+      "password": "pbkdf2_sha256$1200000$HyQh6FW1M7t0avyxLtXabP$AwI1VkH0NOFpWftkQ5jPuLhDdOKCZr0J8Cz7IBwi0tA=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -28,7 +28,7 @@
     "pk": "c0000000-0000-0000-0000-000000000003",
     "fields": {
       "email": "odontologo@prosane.test",
-      "password": "pbkdf2_sha256$1200000$TyMAm43smUi49Yb4motegc$arB3S9b2IHS8mlRGfMh3Jy27LI9Jez1PTR/KGLu4pro=",
+      "password": "pbkdf2_sha256$1200000$HyQh6FW1M7t0avyxLtXabP$AwI1VkH0NOFpWftkQ5jPuLhDdOKCZr0J8Cz7IBwi0tA=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -64,7 +64,7 @@
     "pk": "c0000000-0000-0000-0000-000000000004",
     "fields": {
       "email": "ayudante@prosane.test",
-      "password": "pbkdf2_sha256$1200000$TyMAm43smUi49Yb4motegc$arB3S9b2IHS8mlRGfMh3Jy27LI9Jez1PTR/KGLu4pro=",
+      "password": "pbkdf2_sha256$1200000$HyQh6FW1M7t0avyxLtXabP$AwI1VkH0NOFpWftkQ5jPuLhDdOKCZr0J8Cz7IBwi0tA=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -76,7 +76,7 @@
     "pk": "c0000000-0000-0000-0000-000000000005",
     "fields": {
       "email": "tutor@prosane.test",
-      "password": "pbkdf2_sha256$1200000$TyMAm43smUi49Yb4motegc$arB3S9b2IHS8mlRGfMh3Jy27LI9Jez1PTR/KGLu4pro=",
+      "password": "pbkdf2_sha256$1200000$HyQh6FW1M7t0avyxLtXabP$AwI1VkH0NOFpWftkQ5jPuLhDdOKCZr0J8Cz7IBwi0tA=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -88,7 +88,7 @@
     "pk": "c0000000-0000-0000-0000-000000000006",
     "fields": {
       "email": "medico1@prosane.test",
-      "password": "pbkdf2_sha256$1200000$TyMAm43smUi49Yb4motegc$arB3S9b2IHS8mlRGfMh3Jy27LI9Jez1PTR/KGLu4pro=",
+      "password": "pbkdf2_sha256$1200000$HyQh6FW1M7t0avyxLtXabP$AwI1VkH0NOFpWftkQ5jPuLhDdOKCZr0J8Cz7IBwi0tA=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -100,7 +100,7 @@
     "pk": "c0000000-0000-0000-0000-000000000007",
     "fields": {
       "email": "odontologo1@prosane.test",
-      "password": "pbkdf2_sha256$1200000$TyMAm43smUi49Yb4motegc$arB3S9b2IHS8mlRGfMh3Jy27LI9Jez1PTR/KGLu4pro=",
+      "password": "pbkdf2_sha256$1200000$HyQh6FW1M7t0avyxLtXabP$AwI1VkH0NOFpWftkQ5jPuLhDdOKCZr0J8Cz7IBwi0tA=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
