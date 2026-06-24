@@ -18,6 +18,8 @@ class Tutor(BaseModel):
         null=True,
         blank=True,
     )
+    consentimiento_aceptado = models.BooleanField(default=False)
+    fecha_consentimiento = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         managed = True

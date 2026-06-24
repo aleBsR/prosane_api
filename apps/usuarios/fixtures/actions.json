@@ -78,5 +78,277 @@
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
     }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "crearOperativo",
+      "label": "Crear operativo",
+      "icon": "add_circle",
+      "color": "#2E7D32",
+      "type": "crud",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 21,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "editarOperativo",
+      "label": "Editar operativo",
+      "icon": "edit",
+      "color": "#6A1B9A",
+      "type": "crud",
+      "category": "operativos",
+      "is_sensitive": false,
+      "sort_order": 22,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "confirmarOperativo",
+      "label": "Confirmar operativo",
+      "icon": "check_circle",
+      "color": "#2E7D32",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 23,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "finalizarOperativo",
+      "label": "Finalizar operativo",
+      "icon": "flag",
+      "color": "#1565C0",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 24,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "iniciarOperativo",
+      "label": "Iniciar operativo",
+      "icon": "play_arrow",
+      "color": "#2196F3",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": false,
+      "sort_order": 25,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cancelarOperativo",
+      "label": "Cancelar operativo",
+      "icon": "cancel",
+      "color": "#C62828",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 26,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "gestionarProfesionalesEnOperativo",
+      "label": "Gestionar profesionales en operativo",
+      "icon": "people",
+      "color": "#6A1B9A",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 27,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "importarNominaOperativo",
+      "label": "Importar nómina de operativo",
+      "icon": "upload_file",
+      "color": "#6A1B9A",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 28,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "gestionarEstadoAlumnoEnOperativo",
+      "label": "Gestionar estado de alumno en operativo",
+      "icon": "assignment_turned_in",
+      "color": "#1565C0",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": false,
+      "sort_order": 29,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cargarEvaluacionMedica",
+      "label": "Cargar evaluación médica",
+      "icon": "medical_services",
+      "color": "#6A1B9A",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 30,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cargarEvaluacionOdontologica",
+      "label": "Cargar evaluación odontológica",
+      "icon": "dentistry",
+      "color": "#6A1B9A",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": true,
+      "sort_order": 31,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cargarSeccionEscuela",
+      "label": "Cargar sección escuela",
+      "icon": "school",
+      "color": "#1565C0",
+      "type": "action",
+      "category": "operativos",
+      "is_sensitive": false,
+      "sort_order": 32,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "registrarHijo",
+      "label": "Registrar hijo",
+      "icon": "person_add",
+      "color": "#6A4C93",
+      "type": "crud",
+      "category": "familia",
+      "is_sensitive": true,
+      "sort_order": 50,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "verHijos",
+      "label": "Mis hijos",
+      "icon": "family_restroom",
+      "color": "#6A4C93",
+      "type": "crud",
+      "category": "familia",
+      "is_sensitive": false,
+      "sort_order": 51,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "darConsentimiento",
+      "label": "Dar consentimiento",
+      "icon": "check_circle",
+      "color": "#6A4C93",
+      "type": "action",
+      "category": "familia",
+      "is_sensitive": true,
+      "sort_order": 52,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cargarAntecedentesFamiliares",
+      "label": "Cargar antecedentes familiares",
+      "icon": "medical_information",
+      "color": "#6A4C93",
+      "type": "action",
+      "category": "familia",
+      "is_sensitive": true,
+      "sort_order": 53,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.action",
+    "fields": {
+      "name": "cargarAntecedentesNino",
+      "label": "Cargar antecedentes de salud del niño/a",
+      "icon": "medical_information",
+      "color": "#6A4C93",
+      "type": "action",
+      "category": "familia",
+      "is_sensitive": true,
+      "sort_order": 54,
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
   }
 ]

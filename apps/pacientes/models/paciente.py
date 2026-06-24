@@ -24,6 +24,24 @@ class Paciente(BaseModel):
     tipo_cobertura = models.CharField(max_length=20, blank=True, null=True)
     nombre_cobertura = models.CharField(max_length=20, blank=True, null=True)
 
+    consentimiento_aceptado = models.BooleanField(default=False)
+    fecha_consentimiento = models.DateTimeField(null=True, blank=True)
+    telefono_fijo = models.CharField(max_length=20, blank=True, null=True)
+    celular = models.CharField(max_length=20, blank=True, null=True)
+
     class Meta:
         managed = True
         db_table = "pacientes"
+
+    @property
+    def adulto(self):
+        """Adulto que firma el consentimiento: siempre es el tutor del paciente."""
+        if self.tutor_id and self.tutor.persona:
+            persona = self.tutor.persona
+            return {
+                "nombre": persona.nombre,
+                "apellido": persona.apellido,
+                "tipo_documento": persona.tipo_dni,
+                "dni": persona.dni,
+            }
+        return None

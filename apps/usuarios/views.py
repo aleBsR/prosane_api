@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -5,7 +6,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from apps.usuarios.serializers import UserSerializer
+from apps.antecedentes.models import AntecedenteFamiliarTutor
+from apps.tutores.models import Tutor
 from apps.usuarios.action_resolution import effective_actions
 
 
@@ -35,13 +37,37 @@ class LogoutView(APIView):
 
 
 class MeView(APIView):
-    """GET /auth/me/ — perfil del usuario autenticado + roles + acciones."""
+    """GET /auth/me/ — contrato congelado: user + roles + actions + meta."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        serializer = UserSerializer(user)
-        data = serializer.data
-        data['roles'] = list(user.roles.values('id', 'rol'))
-        data['actions'] = effective_actions(user)
+        persona = getattr(user, "persona", None)
+        tutor = Tutor.objects.filter(usuario=user).first()
+        antecedentes_completos = False
+        if tutor:
+            antecedentes_completos = AntecedenteFamiliarTutor.objects.filter(tutor=tutor).exists()
+
+        roles = [
+            {"name": r.rol, "label": r.rol.capitalize()}
+            for r in user.roles.all()
+        ]
+        data = {
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "nombre": getattr(persona, "nombre", "") or "",
+                "apellido": getattr(persona, "apellido", "") or "",
+                "is_staff": user.is_staff,
+                "tutor_id": str(tutor.id) if tutor else None,
+                "consentimiento_aceptado": tutor.consentimiento_aceptado if tutor else False,
+                "antecedentes_familiares_completos": antecedentes_completos,
+            },
+            "roles": roles,
+            "actions": effective_actions(user),
+            "meta": {
+                "version": "1",
+                "permissions_synced_at": timezone.now().isoformat(),
+            },
+        }
         return Response(data)

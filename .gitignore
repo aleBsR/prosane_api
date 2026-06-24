@@ -18,9 +18,29 @@ ENV/
 env.bak/
 venv.bak/
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Carpetas
-.der
 .opencode
+context
 
 TODO_pacientes.md
 AGENTS.md

@@ -15,10 +15,23 @@ from apps.usuarios.management.commands._fixture_uuids import role_uuid
 # Mapeo rol → nombres de acción.
 # Este diccionario reemplaza al fixture de role_actions y evita depender de UUIDs.
 ROLE_ACTIONS = {
-    "ayudante": ["verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela", "verOperativo"],
-    "medico": ["verOperativo"],
-    "odontologo": ["verOperativo"],
-    "tutor": ["verEscuelas"],
+    "ayudante": [
+        "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
+        "verOperativo", "crearOperativo", "editarOperativo",
+        "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
+        "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
+        "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
+    ],
+    "medico": [
+        "verOperativo", "gestionarEstadoAlumnoEnOperativo", "cargarEvaluacionMedica",
+    ],
+    "odontologo": [
+        "verOperativo", "gestionarEstadoAlumnoEnOperativo", "cargarEvaluacionOdontologica",
+    ],
+    "tutor": [
+        "verEscuelas", "registrarHijo", "verHijos",
+        "darConsentimiento", "cargarAntecedentesFamiliares", "cargarAntecedentesNino",
+    ],
 }
 
 
