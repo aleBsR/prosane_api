@@ -179,10 +179,11 @@ python manage.py createsuperuser
 
 ## Rama activa
 
-El desarrollo principal está en la rama `ale-base`. La rama `base` contiene la versión estable.
+El desarrollo principal está en la rama `dev-base`. La rama `base` contiene la arquitectura de las carpetas.
+
 
 ```bash
-git checkout ale-base
+git checkout dev-base
 ```
 
 ---
