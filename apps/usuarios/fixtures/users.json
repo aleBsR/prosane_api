@@ -35,30 +35,7 @@
       "date_joined": "2026-01-01T00:00:00Z"
     }
   },
-    {
-    "model": "usuarios.usuario",
-    "pk": "c0000000-0000-0000-0000-000000000010",
-    "fields": {
-      "email": "odontologo1@prosane.test",
-      "password": "pbkdf2_sha256$720000$iP0snVAojphBCbTHjHnAlV$Z3Ixsk9lRSBQydCc2kEJuBDjgEDeR35d0AUsaVFp9DQ=",
-      "is_superuser": false,
-      "is_staff": false,
-      "is_active": true,
-      "date_joined": "2026-01-01T00:00:00Z"
-    }
-  },
-    {
-    "model": "usuarios.usuario",
-    "pk": "c0000000-0000-0000-0000-000000000011",
-    "fields": {
-      "email": "medico1@prosane.test",
-      "password": "pbkdf2_sha256$720000$iP0snVAojphBCbTHjHnAlV$Z3Ixsk9lRSBQydCc2kEJuBDjgEDeR35d0AUsaVFp9DQ=",
-      "is_superuser": false,
-      "is_staff": false,
-      "is_active": true,
-      "date_joined": "2026-01-01T00:00:00Z"
-    }
-  },
+
   {
     "model": "usuarios.usuario",
     "pk": "c0000000-0000-0000-0000-000000000004",
