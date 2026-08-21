@@ -27,6 +27,7 @@ TEST_USERS = [
     ("tutor@prosane.test", "c0000000-0000-0000-0000-000000000005", False, "tutor"),
     ("medico1@prosane.test", "c0000000-0000-0000-0000-000000000006", False, "medico"),
     ("odontologo1@prosane.test", "c0000000-0000-0000-0000-000000000007", False, "odontologo"),
+    ("escuela@prosane.test", "c0000000-0000-0000-0000-000000000008", False, "escuela"),
 ]
 
 _TS = "2026-01-01T00:00:00Z"

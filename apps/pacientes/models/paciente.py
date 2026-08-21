@@ -19,6 +19,13 @@ class Paciente(BaseModel):
         models.DO_NOTHING,
         db_column="id_persona",
     )
+    escuela = models.ForeignKey(
+        "escuelas.Escuela",
+        models.SET_NULL,
+        related_name="pacientes",
+        null=True,
+        blank=True,
+    )
     edad = models.IntegerField()
     tiene_cud = models.CharField(max_length=2, blank=True, null=True)
     tipo_cobertura = models.CharField(max_length=20, blank=True, null=True)

@@ -24,3 +24,6 @@ PASSWORD_HASHERS = [
 # URLconf vacío: aísla los tests de bugs pre-existentes en config.urls
 # (p. ej. falta patients/urls.py). Ver config/test_urls.py.
 ROOT_URLCONF = "config.test_urls"
+
+# Email en memoria: los tests de reset de contraseña usan `mail.outbox`.
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"

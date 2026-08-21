@@ -28,6 +28,13 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
         blank=True,
         null=True,
     )
+    escuela = models.ForeignKey(
+        "escuelas.Escuela",
+        models.SET_NULL,
+        related_name="usuarios_escuela",
+        blank=True,
+        null=True,
+    )
     email = models.EmailField(unique=True, max_length=256, blank=True, null=True)
     password = models.CharField(max_length=256, db_column="password_hash", blank=True, null=True)
 

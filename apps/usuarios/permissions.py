@@ -32,3 +32,17 @@ def require_action(action_name):
             return bool(request.user.has_perm(action_name))
 
     return _RequireAction
+
+
+def require_any_action(*action_names):
+    """Permission class that accepts any one of the supplied actions."""
+    if not action_names:
+        raise ValueError("require_any_action necesita al menos una acción")
+
+    class _RequireAnyAction(IsAuthenticated):
+        def has_permission(self, request, view):
+            if not super().has_permission(request, view):
+                return False
+            return any(request.user.has_perm(name) for name in action_names)
+
+    return _RequireAnyAction

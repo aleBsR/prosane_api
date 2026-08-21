@@ -39,7 +39,7 @@ class PermissionTest(TestCase):
         self.assertEqual(len(actions), 1)
         self.assertEqual(
             set(actions[0].keys()),
-            {"name", "label", "icon", "color", "type", "category", "is_sensitive", "sort_order"},
+            {"name", "label", "icon", "color", "type", "category", "is_sensitive", "sort_order", "show_in_menu"},
         )
 
     def test_effective_actions_devuelve_acciones_del_rol(self):
@@ -77,7 +77,7 @@ class SeedPermissionsTest(TestCase):
 
         call_command("seed_permissions", verbosity=0)
 
-        self.assertEqual(Action.objects.filter(is_active=True).count(), 17)
+        self.assertEqual(Action.objects.filter(is_active=True).count(), 30)
         self.assertTrue(Rol.objects.filter(rol="ayudante").exists())
         self.assertTrue(ActionRole.objects.filter(role__rol="ayudante").exists())
 
@@ -140,9 +140,7 @@ class AuthAPITest(BaseAuthFixtureTest):
         self.assertEqual(action_names, [
             "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
             "verOperativo", "crearOperativo", "editarOperativo",
-            "confirmarOperativo", "finalizarOperativo", "cancelarOperativo",
-            "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
-            "gestionarEstadoAlumnoEnOperativo",
+            "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
         ])
 
     def test_me_unauthenticated(self):
@@ -199,41 +197,35 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         return {a["name"] for a in res.data["actions"]}
 
-    def test_me_ayudante_tiene_todas_las_acciones(self):
+    def test_me_ayudante_tiene_acciones_de_escuela_operativo_y_usuarios(self):
         user = Usuario.objects.get(email="ayudante@prosane.test")
         actions = self._action_names(user)
         self.assertEqual(actions, {
             "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
             "verOperativo", "crearOperativo", "editarOperativo",
-            "confirmarOperativo", "finalizarOperativo", "cancelarOperativo",
-            "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
-            "gestionarEstadoAlumnoEnOperativo",
+            "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
         })
 
     def test_me_tutor_ve_escuelas_y_familia(self):
         user = Usuario.objects.get(email="tutor@prosane.test")
         actions = self._action_names(user)
         self.assertEqual(actions, {
-            "verEscuelas", "registrarHijo", "verHijos",
-            "darConsentimiento", "cargarAntecedentesFamiliares",
+            "verEscuelas", "registrarHijo", "verHijos", "darConsentimiento",
         })
 
     def test_me_medico_solo_ve_operativo(self):
         user = Usuario.objects.get(email="medico@prosane.test")
         actions = self._action_names(user)
-        self.assertEqual(actions, {"verOperativo", "gestionarEstadoAlumnoEnOperativo"})
+        self.assertEqual(actions, {"verOperativo"})
 
-    def test_me_superuser_ve_todas_las_acciones(self):
+    def test_me_superadmin_ve_acciones_de_administracion(self):
         user = Usuario.objects.get(email="superadmin@prosane.test")
         actions = self._action_names(user)
         self.assertEqual(actions, {
             "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
             "verOperativo", "crearOperativo", "editarOperativo",
-            "confirmarOperativo", "finalizarOperativo", "cancelarOperativo",
-            "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
-            "gestionarEstadoAlumnoEnOperativo",
-            "registrarHijo", "verHijos",
-            "darConsentimiento", "cargarAntecedentesFamiliares",
+            "verGestionUsuarios",
+            "gestionarUsuariosEscuela", "gestionarAyudantes", "gestionarProfesionales",
         })
 
 
@@ -306,3 +298,239 @@ class TutorAccionesFamiliaTest(APITestCase):
         names = {a["name"] for a in res.data["actions"]}
         self.assertIn("registrarHijo", names)
         self.assertIn("verHijos", names)
+
+
+class UsuariosEscuelaApiTest(BaseAuthFixtureTest):
+    """Tests de /usuarios/escuelas/ — alta y gestión de cuentas de escuela."""
+
+    def setUp(self):
+        from apps.escuelas.models import Escuela
+        self.escuela = Escuela.objects.create(nombre="Escuela Test", cue="1234567")
+        self.client.force_authenticate(Usuario.objects.get(email="superadmin@prosane.test"))
+
+    def _list_url(self):
+        return reverse("usuarios-escuela-list-create")
+
+    def _detail_url(self, pk):
+        return reverse("usuario-escuela-detail", kwargs={"pk": pk})
+
+    def test_list_requiere_autenticacion(self):
+        self.client.force_authenticate(user=None)
+        res = self.client.get(self._list_url())
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_prohibido_sin_la_accion(self):
+        self.client.force_authenticate(Usuario.objects.get(email="tutor@prosane.test"))
+        res = self.client.get(self._list_url())
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_solo_usuarios_con_rol_escuela(self):
+        res = self.client.get(self._list_url())
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        emails = [u["email"] for u in res.data]
+        self.assertIn("escuela@prosane.test", emails)
+        self.assertNotIn("medico@prosane.test", emails)
+
+    def test_crear_usuario_escuela(self):
+        res = self.client.post(self._list_url(), {
+            "email": "nueva@escuela.test",
+            "password": "clave123",
+            "escuela": str(self.escuela.id),
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["escuela_nombre"], "Escuela Test")
+        self.assertEqual(res.data["rol"], "escuela")
+        usuario = Usuario.objects.get(email="nueva@escuela.test")
+        self.assertTrue(usuario.roles.filter(rol="escuela").exists())
+        self.assertEqual(usuario.escuela_id, self.escuela.id)
+        self.assertTrue(usuario.check_password("clave123"))
+
+    def test_crear_sin_password_falla(self):
+        res = self.client.post(self._list_url(), {
+            "email": "nueva@escuela.test",
+            "escuela": str(self.escuela.id),
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_crear_email_duplicado_falla(self):
+        res = self.client.post(self._list_url(), {
+            "email": "escuela@prosane.test",
+            "password": "clave123",
+            "escuela": str(self.escuela.id),
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_patch_reasigna_escuela_y_password(self):
+        usuario = Usuario.objects.get(email="escuela@prosane.test")
+        res = self.client.patch(self._detail_url(usuario.pk), {
+            "escuela": str(self.escuela.id),
+            "password": "nuevaClave99",
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.escuela_id, self.escuela.id)
+        self.assertTrue(usuario.check_password("nuevaClave99"))
+
+    def test_delete_desactiva_la_cuenta(self):
+        usuario = Usuario.objects.get(email="escuela@prosane.test")
+        res = self.client.delete(self._detail_url(usuario.pk))
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        usuario.refresh_from_db()
+        self.assertFalse(usuario.is_active)
+
+    def test_detalle_404_si_no_es_usuario_escuela(self):
+        medico = Usuario.objects.get(email="medico@prosane.test")
+        res = self.client.get(self._detail_url(medico.pk))
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class PasswordResetTest(BaseAuthFixtureTest):
+    """Tests de /auth/reset-password/ — flujo de "¿Olvidaste tu contraseña?"."""
+
+    def _pedir_codigo(self, email):
+        return self.client.post(reverse("auth-reset-password"), {"email": email}, format="json")
+
+    def _confirmar(self, email, code, new_password):
+        return self.client.post(reverse("auth-reset-password-confirm"), {
+            "email": email, "code": code, "new_password": new_password,
+        }, format="json")
+
+    def test_pedir_codigo_para_email_registrado_envia_mail_con_codigo(self):
+        from django.core import mail
+        import re
+        res = self._pedir_codigo("medico@prosane.test")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("detail", res.data)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("medico@prosane.test", mail.outbox[0].to)
+        self.assertIsNotNone(re.search(r"\b\d{6}\b", mail.outbox[0].body))
+
+    def test_pedir_codigo_para_email_no_registrado_no_revela_y_no_envia(self):
+        from django.core import mail
+        res = self._pedir_codigo("noexiste@test.com")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("detail", res.data)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_confirmar_resetea_la_password_y_permite_login(self):
+        from django.core import mail
+        from apps.usuarios.models import PasswordResetCode
+        self._pedir_codigo("medico@prosane.test")
+        code = PasswordResetCode.objects.get(email="medico@prosane.test").code
+        res = self._confirmar("medico@prosane.test", code, "nueva-clave-2026")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        user = Usuario.objects.get(email="medico@prosane.test")
+        self.assertTrue(user.check_password("nueva-clave-2026"))
+        login = self.client.post(reverse("auth-login"), {
+            "email": "medico@prosane.test", "password": "nueva-clave-2026",
+        }, format="json")
+        self.assertEqual(login.status_code, status.HTTP_200_OK)
+
+    def test_codigo_invalido_falla(self):
+        res = self._confirmar("medico@prosane.test", "000000", "nueva-clave-2026")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_codigo_expirado_falla(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from apps.usuarios.models import PasswordResetCode
+        PasswordResetCode.objects.create(
+            email="medico@prosane.test", code="123456",
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+        res = self._confirmar("medico@prosane.test", "123456", "nueva-clave-2026")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_codigo_de_un_solo_uso(self):
+        from django.core import mail
+        from apps.usuarios.models import PasswordResetCode
+        self._pedir_codigo("medico@prosane.test")
+        code = PasswordResetCode.objects.get(email="medico@prosane.test").code
+        first = self._confirmar("medico@prosane.test", code, "clave-uno-2026")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        second = self._confirmar("medico@prosane.test", code, "clave-dos-2026")
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_pedir_codigo_invalida_codigos_previos(self):
+        from django.core import mail
+        from apps.usuarios.models import PasswordResetCode
+        self._pedir_codigo("medico@prosane.test")
+        code1 = PasswordResetCode.objects.get(email="medico@prosane.test").code
+        self._pedir_codigo("medico@prosane.test")
+        self.assertEqual(len(mail.outbox), 2)
+        # El código anterior quedó invalidado (used_at seteado).
+        self.assertIsNotNone(PasswordResetCode.objects.get(code=code1).used_at)
+
+
+class UsuariosAyudantesApiTest(BaseAuthFixtureTest):
+    """Tests de /usuarios/ayudantes/ — alta de cuentas de ayudante (solo superadmin)."""
+
+    def setUp(self):
+        self.client.force_authenticate(Usuario.objects.get(email="superadmin@prosane.test"))
+
+    def _list_url(self):
+        return reverse("usuarios-ayudantes-list-create")
+
+    def _detail_url(self, pk):
+        return reverse("usuario-ayudante-detail", kwargs={"pk": pk})
+
+    def test_list_requiere_autenticacion(self):
+        self.client.force_authenticate(user=None)
+        res = self.client.get(self._list_url())
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_prohibido_para_ayudante(self):
+        # El ayudante NO puede crear a otros ayudantes (solo superadmin).
+        self.client.force_authenticate(Usuario.objects.get(email="ayudante@prosane.test"))
+        res = self.client.get(self._list_url())
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_solo_usuarios_con_rol_ayudante(self):
+        res = self.client.get(self._list_url())
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        emails = [u["email"] for u in res.data]
+        self.assertIn("ayudante@prosane.test", emails)
+        self.assertNotIn("medico@prosane.test", emails)
+
+    def test_crear_usuario_ayudante(self):
+        res = self.client.post(self._list_url(), {
+            "email": "nuevo@ayudante.test",
+            "password": "clave123",
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["rol"], "ayudante")
+        usuario = Usuario.objects.get(email="nuevo@ayudante.test")
+        self.assertTrue(usuario.roles.filter(rol="ayudante").exists())
+        self.assertTrue(usuario.check_password("clave123"))
+
+    def test_crear_sin_password_falla(self):
+        res = self.client.post(self._list_url(), {"email": "nuevo@ayudante.test"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_crear_email_duplicado_falla(self):
+        res = self.client.post(self._list_url(), {
+            "email": "ayudante@prosane.test", "password": "clave123",
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_patch_password_y_estado(self):
+        usuario = Usuario.objects.get(email="ayudante@prosane.test")
+        res = self.client.patch(self._detail_url(usuario.pk), {
+            "password": "nuevaClave99", "is_active": False,
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.check_password("nuevaClave99"))
+        self.assertFalse(usuario.is_active)
+
+    def test_delete_desactiva_la_cuenta(self):
+        usuario = Usuario.objects.get(email="ayudante@prosane.test")
+        res = self.client.delete(self._detail_url(usuario.pk))
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        usuario.refresh_from_db()
+        self.assertFalse(usuario.is_active)
+
+    def test_detalle_404_si_no_es_usuario_ayudante(self):
+        medico = Usuario.objects.get(email="medico@prosane.test")
+        res = self.client.get(self._detail_url(medico.pk))
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)

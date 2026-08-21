@@ -63,11 +63,12 @@ class OperativoAlumnoSerializer(serializers.ModelSerializer):
     completo = serializers.BooleanField(read_only=True)
     medica_completada = serializers.SerializerMethodField(read_only=True)
     odontologica_completada = serializers.SerializerMethodField(read_only=True)
+    curso_display = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = OperativoAlumno
         fields = [
-            'id', 'operativo', 'paciente', 'curso',
+            'id', 'operativo', 'paciente', 'curso', 'curso_display',
             'apellido', 'nombre', 'tipo_dni', 'dni',
             'fecha_nacimiento', 'sexo', 'estado', 'observaciones',
             'completo', 'medica_completada', 'odontologica_completada',
@@ -86,6 +87,12 @@ class OperativoAlumnoSerializer(serializers.ModelSerializer):
             return obj.evaluacion_odontologica.completada
         except (OperativoAlumno.evaluacion_odontologica.RelatedObjectDoesNotExist, AttributeError):
             return False
+
+    def get_curso_display(self, obj):
+        if not obj.curso_id:
+            return ''
+        partes = [p for p in [obj.curso.sala_grado_anio, obj.curso.division] if p]
+        return ' '.join(partes)
 
 
 class OperativoAlumnoEstadoSerializer(serializers.ModelSerializer):

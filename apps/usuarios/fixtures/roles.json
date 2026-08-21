@@ -1,6 +1,16 @@
 [
   {
     "model": "usuarios.rol",
+    "pk": "67ba3b5f-c7ff-5102-ada9-75f18dd16c97",
+    "fields": {
+      "rol": "superadmin",
+      "ruta": "/home/superadmin",
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.rol",
     "pk": "4e9d0fc2-d6b8-5c60-a421-bd7d1176f40f",
     "fields": {
       "rol": "ayudante",
@@ -35,6 +45,16 @@
     "fields": {
       "rol": "tutor",
       "ruta": "/home/tutor",
+      "created_at": "2026-01-01T00:00:00Z",
+      "updated_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.rol",
+    "pk": "57e58978-2fc1-5be7-9486-5e160596fffe",
+    "fields": {
+      "rol": "escuela",
+      "ruta": "/home/escuela",
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
     }

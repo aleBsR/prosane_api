@@ -24,9 +24,22 @@ MATRICULAS_MOCK = {
 class RefepsService:
     @classmethod
     def consultar(cls, matricula: str) -> dict | None:
+        """Consulta REFEPS por matrícula.
+
+        Returns:
+            dict con los datos del profesional, o None si la matrícula no existe.
+
+        Raises:
+            RefepsError: si el servicio REFEPS no está disponible (caído).
+        """
         if getattr(settings, "REFEPS_MOCK", False):
             return MATRICULAS_MOCK.get(matricula)
-        return cls._consultar_real(matricula)
+        try:
+            return cls._consultar_real(matricula)
+        except RefepsError:
+            raise
+        except Exception:
+            raise RefepsError("Servicio REFEPS no disponible")
 
     @classmethod
     def _consultar_real(cls, matricula: str) -> dict | None:

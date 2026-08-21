@@ -211,3 +211,15 @@ SIMPLE_JWT = {
 # MVP: validación de matrículas contra datos mockeados
 # Cambiar a False cuando se integre con REFEPS real
 REFEPS_MOCK = True
+
+
+# Email (reset de contraseña y avisos).
+# En desarrollo se usa la consola (el correo se imprime en la terminal);
+# en producción configurar el SMTP real vía variables de entorno.
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '25'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'False').lower() == 'true'
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@prosane.gob.ar')

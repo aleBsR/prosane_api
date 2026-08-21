@@ -9,6 +9,7 @@ from django.core.management import call_command
 from rest_framework.test import APITestCase
 
 from apps.escuelas.models import Escuela, Curso
+from apps.personas.models import Domicilio, Persona
 from apps.usuarios.models import Usuario
 from apps.operativos.models import (
     Operativo, OperativoProfesional, OperativoAlumno,
@@ -488,11 +489,14 @@ class ImportarCSVTest(TestCase):
         self.escuela = _create_escuela()
         self.operativo = _create_operativo(self.escuela)
 
-    def _make_csv(self, rows):
-        output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=[
+    def _make_csv(self, rows, con_curso=False):
+        fieldnames = [
             'apellido', 'nombre', 'tipo_dni', 'dni', 'fecha_nacimiento', 'sexo',
-        ])
+        ]
+        if con_curso:
+            fieldnames += ['grado', 'division']
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
@@ -510,6 +514,10 @@ class ImportarCSVTest(TestCase):
         self.assertEqual(resultado['creados'], 2)
         self.assertEqual(resultado['duplicados'], 0)
         self.assertEqual(resultado['errores'], [])
+        juan = OperativoAlumno.objects.get(dni='12345678')
+        self.assertEqual(juan.fecha_nacimiento, date(2015, 3, 15))
+        maria = OperativoAlumno.objects.get(dni='23456789')
+        self.assertEqual(maria.fecha_nacimiento, date(2014, 7, 22))
 
     def test_importar_csv_duplicados(self):
         OperativoAlumno.objects.create(
@@ -530,6 +538,63 @@ class ImportarCSVTest(TestCase):
         resultado = services.importar_csv(self.operativo.id, csv_file)
         self.assertEqual(resultado['creados'], 0)
         self.assertEqual(len(resultado['errores']), 1)
+
+    def test_importar_csv_crea_curso_por_grado_division(self):
+        csv_file = self._make_csv([
+            {'apellido': 'García', 'nombre': 'Juan', 'tipo_dni': 'DNI', 'dni': '12345678', 'fecha_nacimiento': '15/03/2015', 'sexo': 'M', 'grado': '1°', 'division': 'A'},
+            {'apellido': 'Pérez', 'nombre': 'María', 'tipo_dni': 'DNI', 'dni': '23456789', 'fecha_nacimiento': '22/07/2014', 'sexo': 'F', 'grado': '2°', 'division': 'B'},
+            {'apellido': 'Sosa', 'nombre': 'Ana', 'tipo_dni': 'DNI', 'dni': '34567890', 'fecha_nacimiento': '10/01/2014', 'sexo': 'F', 'grado': '1°', 'division': 'A'},
+        ], con_curso=True)
+        resultado = services.importar_csv(self.operativo.id, csv_file)
+        self.assertEqual(resultado['creados'], 3)
+        self.assertEqual(resultado['errores'], [])
+        self.assertEqual(resultado['creados_por_curso'], {'1° A': 2, '2° B': 1})
+
+        curso_1a = Curso.objects.get(escuela=self.escuela, sala_grado_anio='1°', division='A')
+        curso_2b = Curso.objects.get(escuela=self.escuela, sala_grado_anio='2°', division='B')
+        self.assertEqual(OperativoAlumno.objects.get(dni='12345678').curso, curso_1a)
+        self.assertEqual(OperativoAlumno.objects.get(dni='34567890').curso, curso_1a)
+        self.assertEqual(OperativoAlumno.objects.get(dni='23456789').curso, curso_2b)
+        self.assertEqual(curso_1a.ciclo_lectivo, 2026)
+
+    def test_importar_csv_sin_curso_deja_curso_nulo(self):
+        csv_file = self._make_csv([
+            {'apellido': 'García', 'nombre': 'Juan', 'tipo_dni': 'DNI', 'dni': '12345678', 'fecha_nacimiento': '', 'sexo': ''},
+        ])
+        resultado = services.importar_csv(self.operativo.id, csv_file)
+        self.assertEqual(resultado['creados'], 1)
+        self.assertEqual(resultado['creados_por_curso'], {})
+        self.assertIsNone(OperativoAlumno.objects.get(dni='12345678').curso)
+
+    def test_importar_csv_reutiliza_curso_existente(self):
+        _create_curso(self.escuela)
+        csv_file = self._make_csv([
+            {'apellido': 'García', 'nombre': 'Juan', 'tipo_dni': 'DNI', 'dni': '12345678', 'fecha_nacimiento': '', 'sexo': '', 'grado': '1°', 'division': 'A'},
+        ], con_curso=True)
+        resultado = services.importar_csv(self.operativo.id, csv_file)
+        self.assertEqual(resultado['creados'], 1)
+        self.assertEqual(Curso.objects.filter(escuela=self.escuela).count(), 1)
+
+    def test_importar_csv_vincula_paciente_existente_por_dni(self):
+        persona = Persona.objects.create(
+            nombre='Alumno', apellido='Registrado', dni='12345678', tipo_dni='DNI',
+            sexo='F', fecha_nacimiento='2018-01-01',
+        )
+        domicilio = Domicilio.objects.create(
+            localidad='Salta',
+        )
+        from apps.pacientes.models import Paciente
+        paciente = Paciente.objects.create(
+            persona=persona, domicilio=domicilio, escuela=self.escuela, edad=8,
+        )
+        csv_file = self._make_csv([
+            {'apellido': 'Registrado', 'nombre': 'Alumno', 'tipo_dni': 'DNI', 'dni': '12345678', 'fecha_nacimiento': '', 'sexo': ''},
+        ])
+        services.importar_csv(self.operativo.id, csv_file)
+        self.assertEqual(
+            OperativoAlumno.objects.get(dni='12345678').paciente_id,
+            paciente.id,
+        )
 
     def test_importar_csv_solo_borrador_o_confirmado(self):
         op = _create_operativo(self.escuela)

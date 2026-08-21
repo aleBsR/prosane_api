@@ -15,12 +15,22 @@ from apps.usuarios.management.commands._fixture_uuids import role_uuid
 # Mapeo rol → nombres de acción.
 # Este diccionario reemplaza al fixture de role_actions y evita depender de UUIDs.
 ROLE_ACTIONS = {
+    "superadmin": [
+        "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
+        "verOperativo", "crearOperativo", "editarOperativo",
+        "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
+        "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
+        "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
+        "verGestionUsuarios",
+        "gestionarUsuariosEscuela", "gestionarAyudantes", "gestionarProfesionales",
+    ],
     "ayudante": [
         "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
         "verOperativo", "crearOperativo", "editarOperativo",
         "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
         "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
         "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
+        "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
     ],
     "medico": [
         "verOperativo", "gestionarEstadoAlumnoEnOperativo", "cargarEvaluacionMedica",
@@ -31,6 +41,11 @@ ROLE_ACTIONS = {
     "tutor": [
         "verEscuelas", "registrarHijo", "verHijos",
         "darConsentimiento", "cargarAntecedentesFamiliares", "cargarAntecedentesNino",
+    ],
+    "escuela": [
+        "verMiEscuela", "gestionarCursos", "verAlumnosEscuela", "registrarAlumnoEscuela",
+        "verOperativo", "importarNominaOperativo",
+        "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
     ],
 }
 
@@ -55,6 +70,7 @@ def _load_actions():
                 "is_sensitive": fields.get("is_sensitive", False),
                 "sort_order": fields.get("sort_order", 0),
                 "is_active": fields.get("is_active", True),
+                "show_in_menu": fields.get("show_in_menu", True),
                 "created_at": fields.get("created_at"),
                 "updated_at": fields.get("updated_at"),
             },
@@ -91,5 +107,5 @@ class Command(BaseCommand):
                 if created:
                     creadas += 1
 
-        self.stdout.write(f"relaciones rol→acción creadas: {creadas}")
+        self.stdout.write(f"relaciones rol->acción creadas: {creadas}")
         self.stdout.write(self.style.SUCCESS("Seed de permisos OK"))

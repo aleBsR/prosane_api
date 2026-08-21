@@ -5,6 +5,10 @@ from datetime import datetime
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
+from apps.escuelas.models import Curso
+from apps.pacientes.models import Paciente
+from apps.personas.models import Persona
+
 from .models import Operativo, OperativoAlumno, OperativoProfesional
 
 
@@ -177,6 +181,7 @@ def importar_csv(operativo_id, archivo_csv):
     duplicados = 0
     errores = []
     fila = 0
+    creados_por_curso = {}
 
     for row in reader:
         fila += 1
@@ -186,7 +191,14 @@ def importar_csv(operativo_id, archivo_csv):
                 errores.append(f'Fila {fila}: DNI vacío')
                 continue
 
-            _, created = OperativoAlumno.objects.get_or_create(
+            curso = _buscar_o_crear_curso(
+                operativo.escuela_id,
+                row.get('grado', '').strip(),
+                row.get('division', '').strip(),
+                operativo.fecha.year,
+            )
+
+            alumno, created = OperativoAlumno.objects.get_or_create(
                 operativo=operativo,
                 dni=dni,
                 defaults={
@@ -195,10 +207,19 @@ def importar_csv(operativo_id, archivo_csv):
                     'tipo_dni': row.get('tipo_dni', 'DNI').strip(),
                     'fecha_nacimiento': _parse_fecha(row.get('fecha_nacimiento', '').strip()),
                     'sexo': row.get('sexo', '').strip(),
+                    'curso': curso,
                 },
             )
+            if not alumno.paciente_id:
+                paciente = _buscar_paciente_por_dni(dni)
+                if paciente is not None:
+                    alumno.paciente = paciente
+                    alumno.save(update_fields=['paciente', 'updated_at'])
             if created:
                 creados += 1
+                if curso is not None:
+                    etiqueta = _curso_etiqueta(curso)
+                    creados_por_curso[etiqueta] = creados_por_curso.get(etiqueta, 0) + 1
             else:
                 duplicados += 1
         except Exception as e:
@@ -209,6 +230,7 @@ def importar_csv(operativo_id, archivo_csv):
         'duplicados': duplicados,
         'errores': errores,
         'total_filas': fila,
+        'creados_por_curso': creados_por_curso,
     }
 
 
@@ -219,3 +241,32 @@ def _parse_fecha(value):
         return datetime.strptime(value, '%d/%m/%Y').date()
     except (ValueError, TypeError):
         return None
+
+
+def _buscar_paciente_por_dni(dni):
+    persona_id = Persona.objects.filter(dni=dni).values_list('id', flat=True).first()
+    if not persona_id:
+        return None
+    return Paciente.objects.filter(persona_id=persona_id).first()
+
+
+def _buscar_o_crear_curso(escuela_id, grado, division, ciclo_lectivo):
+    """Devuelve el Curso del grado/división en la escuela del operativo.
+
+    Si la fila no trae grado ni división devuelve None (nómina sin curso).
+    Si el curso no existe aún, se crea automáticamente.
+    """
+    if not grado and not division:
+        return None
+    curso, _ = Curso.objects.get_or_create(
+        escuela_id=escuela_id,
+        sala_grado_anio=grado,
+        division=division,
+        defaults={'nivel': '', 'ciclo_lectivo': ciclo_lectivo},
+    )
+    return curso
+
+
+def _curso_etiqueta(curso):
+    partes = [p for p in [curso.sala_grado_anio, curso.division] if p]
+    return ' '.join(partes) or 'Sin curso'

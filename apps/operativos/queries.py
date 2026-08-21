@@ -29,6 +29,11 @@ def operativos_visibles_para_usuario(user):
     if 'ayudante' in roles:
         return Operativo.objects.filter(created_by=user)
 
+    if 'escuela' in roles:
+        if not user.escuela_id:
+            return Operativo.objects.none()
+        return Operativo.objects.filter(escuela_id=user.escuela_id)
+
     if roles & {'medico', 'odontologo'}:
         return Operativo.objects.filter(profesionales_asignados__profesional=user)
 
@@ -48,6 +53,9 @@ def obtener_operativo_visible(user, operativo_id):
     roles = _roles_usuario(user)
 
     if 'ayudante' in roles and operativo.created_by == user:
+        return operativo
+
+    if 'escuela' in roles and user.escuela_id == operativo.escuela_id:
         return operativo
 
     if roles & {'medico', 'odontologo'}:

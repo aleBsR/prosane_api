@@ -3,7 +3,8 @@ from django.db import connection, models
 from django.test import TransactionTestCase
 from django.test.utils import isolate_apps
 
-from common.models import BaseModel
+from common.managers import SoftDeleteManager, SoftDeleteQuerySet
+from common.models import UUIDPrimaryKeyModel
 
 
 class AuditModelTestCase(TransactionTestCase):
@@ -20,6 +21,11 @@ class AuditModelTestCase(TransactionTestCase):
     Las tablas de `personas` y `usuarios` ya existen en la base de tests porque
     sus modelos son `managed = True` y las migraciones las crean. Solo creamos
     la tabla efímera de `AuditExample`.
+
+    IMPORTANTE: las FK a `settings.AUTH_USER_MODEL` se crean con
+    `db_constraint=False` para que Django/PostgreSQL pueda hacer `flush` de la
+    base de tests entre tests sin violar constraints de clave foránea con una
+    tabla efímera que no conoce.
     """
 
     @classmethod
@@ -36,11 +42,57 @@ class AuditModelTestCase(TransactionTestCase):
                 model._meta.model_name
             ] = model
 
-        class AuditExample(BaseModel):
+        UserModel = global_apps.get_model("usuarios", "Usuario")
+
+        class AuditExample(UUIDPrimaryKeyModel):
             name = models.CharField(max_length=50, blank=True, default="")
+            created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+            created_year = models.IntegerField(null=True, blank=True, db_index=True)
+            created_year_month = models.CharField(
+                max_length=7, null=True, blank=True, db_index=True
+            )
+            updated_at = models.DateTimeField(auto_now=True)
+            updated_year = models.IntegerField(null=True, blank=True)
+            updated_year_month = models.CharField(
+                max_length=7, null=True, blank=True
+            )
+            created_by = models.ForeignKey(
+                UserModel,
+                null=True,
+                blank=True,
+                on_delete=models.SET_NULL,
+                related_name="+",
+                db_column="created_by",
+                db_constraint=False,
+            )
+            updated_by = models.ForeignKey(
+                UserModel,
+                null=True,
+                blank=True,
+                on_delete=models.SET_NULL,
+                related_name="+",
+                db_column="updated_by",
+                db_constraint=False,
+            )
+            deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+            objects = SoftDeleteManager()
+            all_objects = SoftDeleteQuerySet.as_manager()
 
             class Meta:
                 app_label = "common"
+
+            def delete(self, using=None, keep_parents=False):
+                from django.utils import timezone
+                self.deleted_at = timezone.now()
+                self.save(update_fields=["deleted_at", "updated_at"])
+
+            def hard_delete(self, using=None, keep_parents=False):
+                super().delete(using=using, keep_parents=keep_parents)
+
+            def restore(self):
+                self.deleted_at = None
+                self.save(update_fields=["deleted_at", "updated_at"])
 
         cls.AuditExample = AuditExample
 

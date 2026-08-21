@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db import models
 
-from apps.usuarios.permissions import require_action
+from apps.usuarios.permissions import require_action, require_any_action
 from .models import Escuela, Curso
 from .serializers import EscuelaSerializer, EscuelaListSerializer, CursoSerializer
 
@@ -75,51 +75,95 @@ class EscuelaDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class MiEscuelaView(APIView):
+    permission_classes = [require_action('verMiEscuela')]
+
+    def get(self, request):
+        escuela = getattr(request.user, 'escuela', None)
+        if escuela is None:
+            return Response(
+                {'detail': 'El usuario no tiene una escuela asignada.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = EscuelaSerializer(escuela).data
+        cursos = Curso.objects.filter(escuela=escuela).order_by(
+            'sala_grado_anio', 'division', 'ciclo_lectivo',
+        )
+        data['cursos'] = CursoSerializer(cursos, many=True).data
+        return Response(data)
+
+
 class CursoListCreateView(APIView):
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [require_action('verEscuelas')()]
-        return [require_action('editarEscuela')()]
+            return [require_any_action('verEscuelas', 'verMiEscuela')()]
+        return [require_any_action('editarEscuela', 'gestionarCursos')()]
+
+    def _escuela(self, request, escuela_pk):
+        if 'escuela' in request.user.roles.values_list('rol', flat=True):
+            if request.user.escuela_id != escuela_pk:
+                return None
+        return get_object_or_404(Escuela, pk=escuela_pk)
 
     def get(self, request, escuela_pk):
+        es_escuela = request.user.roles.filter(rol='escuela').exists()
+        if es_escuela and request.user.escuela_id != escuela_pk:
+            return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
         cursos = Curso.objects.filter(escuela_id=escuela_pk)
         serializer = CursoSerializer(cursos, many=True)
         return Response(serializer.data)
 
     def post(self, request, escuela_pk):
-        get_object_or_404(Escuela, pk=escuela_pk)
+        escuela = self._escuela(request, escuela_pk)
+        if escuela is None:
+            return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
         serializer = CursoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(escuela_id=escuela_pk)
+        serializer.save(escuela=escuela)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class CursoDetailView(APIView):
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [require_action('verEscuelas')()]
-        return [require_action('editarEscuela')()]
+            return [require_any_action('verEscuelas', 'verMiEscuela')()]
+        return [require_any_action('editarEscuela', 'gestionarCursos')()]
+
+    def _curso(self, request, escuela_pk, pk):
+        if 'escuela' in request.user.roles.values_list('rol', flat=True):
+            if request.user.escuela_id != escuela_pk:
+                return None
+        return get_object_or_404(Curso, escuela_id=escuela_pk, pk=pk)
 
     def get(self, request, escuela_pk, pk):
-        curso = get_object_or_404(Curso, escuela_id=escuela_pk, pk=pk)
+        curso = self._curso(request, escuela_pk, pk)
+        if curso is None:
+            return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
         serializer = CursoSerializer(curso)
         return Response(serializer.data)
 
     def put(self, request, escuela_pk, pk):
-        curso = get_object_or_404(Curso, escuela_id=escuela_pk, pk=pk)
+        curso = self._curso(request, escuela_pk, pk)
+        if curso is None:
+            return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
         serializer = CursoSerializer(curso, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
     def patch(self, request, escuela_pk, pk):
-        curso = get_object_or_404(Curso, escuela_id=escuela_pk, pk=pk)
+        curso = self._curso(request, escuela_pk, pk)
+        if curso is None:
+            return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
         serializer = CursoSerializer(curso, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
 
     def delete(self, request, escuela_pk, pk):
-        curso = get_object_or_404(Curso, escuela_id=escuela_pk, pk=pk)
+        curso = self._curso(request, escuela_pk, pk)
+        if curso is None:
+            return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
         curso.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

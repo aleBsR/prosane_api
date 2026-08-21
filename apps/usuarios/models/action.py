@@ -14,6 +14,10 @@ class Action(BaseModel):
     is_sensitive = models.BooleanField(default=False)
     sort_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    show_in_menu = models.BooleanField(
+        default=True,
+        help_text="Si es falso, la acción otorga permiso pero no aparece como tile del menú principal.",
+    )
 
     class Meta:
         db_table = 'actions'

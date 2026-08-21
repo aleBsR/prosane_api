@@ -118,8 +118,14 @@ El servidor arranca en `http://localhost:8000`.
 | `odontologo@prosane.test` | Odontólogo — ver operativos, evaluar alumnos |
 | `ayudante@prosane.test` | Ayudante — CRUD escuelas, gestión completa de operativos |
 | `tutor@prosane.test` | Tutor — registro de hijos, ver escuelas |
+| `escuela@prosane.test` | Escuela — alumnos, cursos y operativos de su escuela |
 
 ---
+
+## Guia de pruebas
+
+El flujo completo por roles esta documentado en:
+`C:\Users\usuario\Documents\Alejandro\Documentos\Escuela\GUIA_PRUEBAS_FLUJO_COMPLETO.md`
 
 ## Documentación interactiva de la API
 
