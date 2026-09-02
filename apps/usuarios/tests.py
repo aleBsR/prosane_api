@@ -140,6 +140,9 @@ class AuthAPITest(BaseAuthFixtureTest):
         self.assertEqual(action_names, [
             "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
             "verOperativo", "crearOperativo", "editarOperativo",
+            "confirmarOperativo", "finalizarOperativo", "iniciarOperativo", "cancelarOperativo",
+            "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
+            "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
             "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
         ])
 
@@ -203,20 +206,26 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
         self.assertEqual(actions, {
             "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
             "verOperativo", "crearOperativo", "editarOperativo",
+            "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
+            "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
+            "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
             "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
         })
 
-    def test_me_tutor_ve_escuelas_y_familia(self):
+    def test_me_tutor_recibe_permisos_de_escuela_y_familia(self):
         user = Usuario.objects.get(email="tutor@prosane.test")
         actions = self._action_names(user)
         self.assertEqual(actions, {
             "verEscuelas", "registrarHijo", "verHijos", "darConsentimiento",
+            "cargarAntecedentesFamiliares", "cargarAntecedentesNino",
         })
 
-    def test_me_medico_solo_ve_operativo(self):
+    def test_me_medico_recibe_permiso_de_evaluacion_medica(self):
         user = Usuario.objects.get(email="medico@prosane.test")
         actions = self._action_names(user)
-        self.assertEqual(actions, {"verOperativo"})
+        self.assertEqual(actions, {
+            "verOperativo", "gestionarEstadoAlumnoEnOperativo", "cargarEvaluacionMedica",
+        })
 
     def test_me_superadmin_ve_acciones_de_administracion(self):
         user = Usuario.objects.get(email="superadmin@prosane.test")
@@ -224,6 +233,9 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
         self.assertEqual(actions, {
             "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
             "verOperativo", "crearOperativo", "editarOperativo",
+            "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
+            "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
+            "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
             "verGestionUsuarios",
             "gestionarUsuariosEscuela", "gestionarAyudantes", "gestionarProfesionales",
         })

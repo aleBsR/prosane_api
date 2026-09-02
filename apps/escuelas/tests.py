@@ -5,7 +5,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from apps.escuelas.models import Escuela, Curso
-from apps.personas.models import Domicilio
+from apps.personas.models import Domicilio, Persona
+from apps.usuarios.models import Rol
 from apps.escuelas.serializers import (
     EscuelaSerializer, EscuelaListSerializer, CursoSerializer,
 )
@@ -200,8 +201,29 @@ class EscuelaListSerializerTest(TestCase):
     def test_campos_lista(self):
         e = Escuela.objects.create(nombre='Test')
         s = EscuelaListSerializer(e)
-        expected = {'id', 'nombre', 'cue', 'ambito', 'activa', 'localidad'}
+        expected = {
+            'id', 'nombre', 'cue', 'ambito', 'activa', 'localidad',
+            'usuarios_asociados',
+        }
         self.assertEqual(set(s.data.keys()), expected)
+
+    def test_usuarios_asociados(self):
+        persona = Persona.objects.create(
+            nombre='Ana', apellido='Gómez', dni='99999999',
+            sexo='femenino', fecha_nacimiento='1990-01-01',
+        )
+        e = Escuela.objects.create(nombre='Test')
+        user = Usuario.objects.create_user(
+            email='escuela-test@example.com', password='test',
+            persona=persona, escuela=e,
+        )
+        user.roles.add(Rol.objects.create(rol='escuela'))
+
+        data = EscuelaListSerializer(e).data
+
+        self.assertEqual(len(data['usuarios_asociados']), 1)
+        self.assertEqual(data['usuarios_asociados'][0]['email'], user.email)
+        self.assertEqual(data['usuarios_asociados'][0]['nombre'], 'Ana Gómez')
 
 
 class CursoSerializerTest(TestCase):

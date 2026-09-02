@@ -16,6 +16,7 @@ from apps.operativos.models import (
     EvaluacionMedica, EvaluacionOdontologica,
 )
 from apps.operativos import services
+from apps.operativos.serializers import EvaluacionOdontologicaSerializer
 
 
 # ──────────────────────────────────────────────
@@ -69,7 +70,7 @@ def _create_operativo(escuela, **kwargs):
 
 
 def _completar_alumno(alumno):
-    """Deja un alumno completo: evaluaciones cargadas + sección escuela."""
+    """Deja un alumno completo: evaluaciones cargadas + sección escuela + datos personales y familia."""
     EvaluacionMedica.objects.update_or_create(
         operativo_alumno=alumno, defaults={'completada': True},
     )
@@ -77,6 +78,7 @@ def _completar_alumno(alumno):
         operativo_alumno=alumno, defaults={'completada': True},
     )
     alumno.escuela_completado = True
+    alumno.antecedentes_completado = True
     alumno.estado = OperativoAlumno.EVALUADO
     alumno.save()
 
@@ -220,6 +222,31 @@ class EvaluacionModelTest(TestCase):
         ev.refresh_from_db()
         self.assertEqual(ev.hallazgos['piel']['estado'], 'sin')
         self.assertTrue(ev.derivaciones['odontologia']['deriva'])
+
+    def test_odontograma_admite_caras_y_raiz_por_pieza(self):
+        serializer = EvaluacionOdontologicaSerializer(data={
+            'odontograma': {
+                '16': {
+                    'denticion': 'permanente',
+                    'estado_general': '',
+                    'caras': {'oclusal': 'caries', 'mesial': 'restauracion'},
+                    'raiz': 'conducto_pendiente',
+                    'notas': 'Controlar',
+                },
+            },
+        })
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_odontograma_rechaza_caras_en_pieza_ausente(self):
+        serializer = EvaluacionOdontologicaSerializer(data={
+            'odontograma': {
+                '16': {
+                    'estado_general': 'ausente',
+                    'caras': {'oclusal': 'caries'},
+                },
+            },
+        })
+        self.assertFalse(serializer.is_valid())
 
     def test_onetoone_evita_duplicados(self):
         from django.db import IntegrityError, transaction

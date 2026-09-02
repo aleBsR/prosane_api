@@ -16,7 +16,7 @@ class EscuelaListCreateView(APIView):
         return [require_action('crearEscuela')()]
 
     def get(self, request):
-        qs = Escuela.objects.all()
+        qs = Escuela.objects.prefetch_related('usuarios_escuela__persona', 'usuarios_escuela__roles').all()
         activa = request.query_params.get('activa')
         q = request.query_params.get('q')
         if activa is not None:
@@ -47,7 +47,10 @@ class EscuelaDetailView(APIView):
         return []
 
     def get_object(self, pk):
-        return get_object_or_404(Escuela, pk=pk)
+        return get_object_or_404(
+            Escuela.objects.prefetch_related('usuarios_escuela__persona', 'usuarios_escuela__roles'),
+            pk=pk,
+        )
 
     def get(self, request, pk):
         escuela = self.get_object(pk)

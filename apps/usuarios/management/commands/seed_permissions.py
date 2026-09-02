@@ -14,6 +14,8 @@ from apps.usuarios.management.commands._fixture_uuids import role_uuid
 
 # Mapeo rol → nombres de acción.
 # Este diccionario reemplaza al fixture de role_actions y evita depender de UUIDs.
+# Las acciones con show_in_menu=False son operaciones contextuales (dentro de operativos):
+# se asignan como permisos, pero el backend no las devuelve como tiles del menú.
 ROLE_ACTIONS = {
     "superadmin": [
         "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
@@ -21,6 +23,7 @@ ROLE_ACTIONS = {
         "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
         "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
         "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
+        "cargarAntecedentesNino",
         "verGestionUsuarios",
         "gestionarUsuariosEscuela", "gestionarAyudantes", "gestionarProfesionales",
     ],
@@ -46,6 +49,7 @@ ROLE_ACTIONS = {
         "verMiEscuela", "gestionarCursos", "verAlumnosEscuela", "registrarAlumnoEscuela",
         "verOperativo", "importarNominaOperativo",
         "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
+        "cargarAntecedentesNino",
     ],
 }
 
@@ -59,7 +63,7 @@ def _load_actions():
     created_count = 0
     for item in actions:
         fields = item["fields"]
-        _, created = Action.objects.get_or_create(
+        action, created = Action.objects.get_or_create(
             name=fields["name"],
             defaults={
                 "label": fields["label"],
@@ -75,6 +79,19 @@ def _load_actions():
                 "updated_at": fields.get("updated_at"),
             },
         )
+        if not created:
+            # Los seeds deben corregir cambios de permisos sobre acciones existentes.
+            changed = []
+            for field in (
+                "label", "icon", "color", "type", "category", "is_sensitive",
+                "sort_order", "is_active", "show_in_menu",
+            ):
+                value = fields.get(field, getattr(action, field))
+                if getattr(action, field) != value:
+                    setattr(action, field, value)
+                    changed.append(field)
+            if changed:
+                action.save(update_fields=changed + ["updated_at"])
         if created:
             created_count += 1
     return created_count
@@ -101,9 +118,20 @@ class Command(BaseCommand):
         creadas = 0
         for rol_name, action_names in ROLE_ACTIONS.items():
             rol = Rol.objects.get(rol=rol_name)
+            ActionRole.all_objects.filter(role=rol).exclude(
+                action__name__in=action_names,
+            ).hard_delete()
             for action_name in action_names:
                 action = Action.objects.get(name=action_name)
-                _, created = ActionRole.objects.get_or_create(role=rol, action=action)
+                relation = ActionRole.all_objects.filter(role=rol, action=action).first()
+                if relation is None:
+                    ActionRole.objects.create(role=rol, action=action)
+                    created = True
+                elif relation.deleted_at is not None:
+                    relation.restore()
+                    created = True
+                else:
+                    created = False
                 if created:
                     creadas += 1
 

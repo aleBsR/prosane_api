@@ -31,11 +31,14 @@ def crear_alumno_escuela(escuela_id, data):
             raise AlumnoEscuelaError('El curso no pertenece a tu escuela.', field='curso_id')
     if operativo_id and not curso_id:
         raise AlumnoEscuelaError('Elegí un curso para asociar el alumno al operativo.', field='curso_id')
+    if operativo is not None and operativo.estado not in (Operativo.BORRADOR, Operativo.CONFIRMADO):
+        raise AlumnoEscuelaError('Solo se puede asociar alumnos en operativos en borrador o confirmado.', field='operativo_id')
     persona_data = dict(data['persona'])
     dni = persona_data.get('dni')
     if Persona.objects.filter(dni=dni).exists():
         raise AlumnoEscuelaError('Ya existe una persona con este DNI.', field='persona.dni')
 
+    antecedentes_data = data.get('antecedentes') or {}
     with transaction.atomic():
         domicilio = Domicilio.objects.create(**data.get('domicilio', {}))
         persona = Persona.objects.create(**persona_data)
@@ -52,7 +55,12 @@ def crear_alumno_escuela(escuela_id, data):
             celular=data.get('celular') or None,
             consentimiento_aceptado=False,
         )
-        AntecedentePersonal.objects.get_or_create(paciente=paciente)
+        ant, _ = AntecedentePersonal.objects.get_or_create(paciente=paciente)
+        if antecedentes_data:
+            for k, v in antecedentes_data.items():
+                if hasattr(ant, k):
+                    setattr(ant, k, v)
+            ant.save()
         if operativo is not None:
             OperativoAlumno.objects.create(
                 operativo=operativo,
@@ -67,6 +75,15 @@ def crear_alumno_escuela(escuela_id, data):
             )
 
     return paciente
+
+
+def actualizar_antecedentes_paciente(paciente, data):
+    ant, _ = AntecedentePersonal.objects.get_or_create(paciente=paciente)
+    for k, v in data.items():
+        if hasattr(ant, k):
+            setattr(ant, k, v)
+    ant.save()
+    return ant
 
 
 def listar_alumnos_escuela(escuela_id):

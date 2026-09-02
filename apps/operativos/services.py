@@ -5,9 +5,10 @@ from datetime import datetime
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
+from apps.antecedentes.models import AntecedentePersonal
 from apps.escuelas.models import Curso
 from apps.pacientes.models import Paciente
-from apps.personas.models import Persona
+from apps.personas.models import Domicilio, Persona
 
 from .models import Operativo, OperativoAlumno, OperativoProfesional
 
@@ -22,6 +23,23 @@ ESTADO_TRANSICIONES = {
     Operativo.FINALIZADO: [],
     Operativo.CANCELADO: [],
 }
+
+# Estados donde el operativo es inmutable (bloqueo total, incluso superadmin)
+ESTADOS_NO_EDITABLES = {Operativo.FINALIZADO, Operativo.CANCELADO}
+
+
+def exigir_operativo_mutable(operativo):
+    """Lanza ValueError si el operativo está en estado no editable."""
+    if operativo.estado in ESTADOS_NO_EDITABLES:
+        raise ValueError('El operativo ya está finalizado o cancelado y no se puede modificar')
+
+
+def exigir_operativo_en_curso(operativo):
+    """Lanza ValueError si el operativo no está en curso (para cargar evaluaciones)."""
+    if operativo.estado != Operativo.EN_CURSO:
+        if operativo.estado in ESTADOS_NO_EDITABLES:
+            raise ValueError('El operativo ya está finalizado o cancelado y no se puede modificar')
+        raise ValueError('Solo se puede cargar datos cuando el operativo está en curso')
 
 
 def transicionar_estado(operativo_id, nuevo_estado):
@@ -211,7 +229,16 @@ def importar_csv(operativo_id, archivo_csv):
                 },
             )
             if not alumno.paciente_id:
-                paciente = _buscar_paciente_por_dni(dni)
+                paciente = _asegurar_paciente_para_operativo(
+                    operativo=operativo,
+                    dni=dni,
+                    apellido=row.get('apellido', '').strip(),
+                    nombre=row.get('nombre', '').strip(),
+                    tipo_dni=row.get('tipo_dni', 'DNI').strip(),
+                    fecha_nacimiento=_parse_fecha(row.get('fecha_nacimiento', '').strip()),
+                    sexo=row.get('sexo', '').strip(),
+                    curso=curso,
+                )
                 if paciente is not None:
                     alumno.paciente = paciente
                     alumno.save(update_fields=['paciente', 'updated_at'])
@@ -250,18 +277,116 @@ def _buscar_paciente_por_dni(dni):
     return Paciente.objects.filter(persona_id=persona_id).first()
 
 
+def _asegurar_paciente_para_operativo(operativo, dni, apellido, nombre, tipo_dni, fecha_nacimiento, sexo, curso):
+    """Asegura que exista un Paciente para la escuela del operativo.
+
+    Usado por importar_csv para que los alumnos del operativo también aparezcan
+    en 'Alumnos de mi escuela' (Paciente con escuela_id). Si ya existe un
+    Paciente para ese dni (en cualquier escuela) se reutiliza; si no, se crea
+    Persona + Domicilio + Paciente + AntecedentePersonal.
+    """
+    # Reusar Paciente existente por dni (si ya hay uno en cualquier escuela)
+    paciente = _buscar_paciente_por_dni(dni)
+    if paciente is not None:
+        # Si el paciente no tiene escuela, asignar la del operativo
+        if not paciente.escuela_id:
+            paciente.escuela_id = operativo.escuela_id
+            paciente.save(update_fields=['escuela'])
+        return paciente
+
+    # Crear Persona si no existe
+    try:
+        persona = Persona.objects.get(dni=dni)
+    except Persona.DoesNotExist:
+        # sexo y fecha_nacimiento son obligatorios en Persona; usar defaults si faltan
+        persona = Persona.objects.create(
+            nombre=nombre or '',
+            apellido=apellido or '',
+            dni=dni,
+            tipo_dni=tipo_dni or 'DNI',
+            sexo=sexo or 'otro',
+            fecha_nacimiento=fecha_nacimiento or '2015-01-01',
+        )
+    # Crear domicilio vacío o con localidad de la escuela si se conoce
+    try:
+        escuela = operativo.escuela
+        localidad = ''
+        if escuela and escuela.domicilio:
+            localidad = escuela.domicilio.localidad or ''
+    except Exception:
+        localidad = ''
+    domicilio = Domicilio.objects.create(localidad=localidad)
+
+    # Calcular edad si hay fecha_nacimiento
+    edad = 0
+    if fecha_nacimiento:
+        try:
+            hoy = datetime.now().date()
+            edad = hoy.year - fecha_nacimiento.year - ((hoy.month, hoy.day) < (fecha_nacimiento.month, fecha_nacimiento.day))
+            if edad < 0:
+                edad = 0
+        except Exception:
+            edad = 0
+
+    paciente = Paciente.objects.create(
+        escuela_id=operativo.escuela_id,
+        persona=persona,
+        domicilio=domicilio,
+        tutor=None,
+        edad=edad,
+        consentimiento_aceptado=False,
+    )
+    AntecedentePersonal.objects.get_or_create(paciente=paciente)
+    return paciente
+
+
+def _normalizar_grado(grado: str) -> str:
+    """Normaliza el grado para evitar duplicados por distinto símbolo de grado.
+
+    El CSV usa '1°' (U+00B0) y el seed usa '1º' (U+00BA); se unifican a '°'.
+    """
+    if not grado:
+        return grado
+    return grado.strip().replace('\u00ba', '\u00b0').replace('\u00B0', '\u00b0')
+
+
 def _buscar_o_crear_curso(escuela_id, grado, division, ciclo_lectivo):
     """Devuelve el Curso del grado/división en la escuela del operativo.
 
     Si la fila no trae grado ni división devuelve None (nómina sin curso).
     Si el curso no existe aún, se crea automáticamente.
+    Normaliza el grado para no duplicar por '°' vs 'º'.
     """
-    if not grado and not division:
+    grado_norm = _normalizar_grado(grado)
+    division_norm = division.strip() if division else division
+    if not grado_norm and not division_norm:
         return None
+    # Buscar por grado normalizado (en DB puede haber con 'º' o '°', probamos ambos)
+    # Primero intenta con el normalizado; si no encuentra, busca con la variante.
+    curso = Curso.objects.filter(
+        escuela_id=escuela_id,
+        sala_grado_anio=grado_norm,
+        division=division_norm,
+    ).first()
+    if curso:
+        return curso
+    # Buscar variante con 'º' si el normalizado es '°'
+    variante = grado_norm.replace('\u00b0', '\u00ba') if '\u00b0' in grado_norm else grado_norm.replace('\u00ba', '\u00b0')
+    if variante != grado_norm:
+        curso = Curso.objects.filter(
+            escuela_id=escuela_id,
+            sala_grado_anio=variante,
+            division=division_norm,
+        ).first()
+        if curso:
+            # Actualizar a la forma normalizada para futuro
+            curso.sala_grado_anio = grado_norm
+            curso.save(update_fields=['sala_grado_anio', 'updated_at'])
+            return curso
     curso, _ = Curso.objects.get_or_create(
         escuela_id=escuela_id,
-        sala_grado_anio=grado,
-        division=division,
+        sala_grado_anio=grado_norm,
+        division=division_norm,
         defaults={'nivel': '', 'ciclo_lectivo': ciclo_lectivo},
     )
     return curso

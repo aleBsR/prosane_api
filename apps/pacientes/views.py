@@ -2,6 +2,9 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
+from django.shortcuts import get_object_or_404
+
+from apps.antecedentes.models import AntecedentePersonal
 from apps.usuarios.permissions import require_action
 from .models import Paciente
 from .services.alumnos import (
@@ -30,6 +33,30 @@ class DomicilioAlumnoSerializer(serializers.Serializer):
     localidad = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
+class AntecedentePersonalInputSerializer(serializers.Serializer):
+    nacio_prematuro = serializers.CharField(required=False, allow_blank=True, default="NO")
+    peso_nacimiento = serializers.CharField(required=False, allow_blank=True, default="0")
+    convulsiones_epilepsia = serializers.CharField(required=False, allow_blank=True, default="NO")
+    mareos_desmayos = serializers.CharField(required=False, allow_blank=True, default="NO")
+    infecciones_urinarias = serializers.CharField(required=False, allow_blank=True, default="NO")
+    asma_espasmos = serializers.CharField(required=False, allow_blank=True, default="NO")
+    tuberculosis = serializers.CharField(required=False, allow_blank=True, default="NO")
+    diabetes = serializers.CharField(required=False, allow_blank=True, default="NO")
+    hipertension = serializers.CharField(required=False, allow_blank=True, default="NO")
+    cardiopatia_congenita = serializers.CharField(required=False, allow_blank=True, default="NO")
+    traumatismo_internacion = serializers.CharField(required=False, allow_blank=True, default="NO")
+    diarrea_frecuente = serializers.CharField(required=False, allow_blank=True, default="NO")
+    infecciones_oido = serializers.CharField(required=False, allow_blank=True, default="NO")
+    internacion_previa = serializers.CharField(required=False, allow_blank=True, default="NO")
+    causa_hospitalizacion = serializers.CharField(required=False, allow_blank=True, default="NO")
+    tratamiento_actual = serializers.CharField(required=False, allow_blank=True, default="NO")
+    descripcion_tratamiento = serializers.CharField(required=False, allow_blank=True, default="NINGUNO")
+    ultima_consulta_medica = serializers.CharField(required=False, allow_blank=True, default="NINGUNA")
+    otros_problemas_salud = serializers.CharField(required=False, allow_blank=True, default="NINGUNO")
+    primera_menstruacion = serializers.CharField(required=False, allow_blank=True, default="NO")
+    edad_primera_menstruacion = serializers.IntegerField(required=False, default=0)
+
+
 class AlumnoEscuelaCreateSerializer(serializers.Serializer):
     persona = PersonaAlumnoSerializer()
     domicilio = DomicilioAlumnoSerializer(required=False, default=dict)
@@ -41,6 +68,21 @@ class AlumnoEscuelaCreateSerializer(serializers.Serializer):
     celular = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     curso_id = serializers.UUIDField(required=False, allow_null=True)
     operativo_id = serializers.UUIDField(required=False, allow_null=True)
+    antecedentes = AntecedentePersonalInputSerializer(required=False, default=dict)
+
+
+class AntecedentePersonalOutputSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AntecedentePersonal
+        fields = [
+            'nacio_prematuro', 'peso_nacimiento', 'convulsiones_epilepsia',
+            'mareos_desmayos', 'infecciones_urinarias', 'asma_espasmos',
+            'tuberculosis', 'diabetes', 'hipertension', 'cardiopatia_congenita',
+            'traumatismo_internacion', 'diarrea_frecuente', 'infecciones_oido',
+            'internacion_previa', 'causa_hospitalizacion', 'tratamiento_actual', 'descripcion_tratamiento',
+            'ultima_consulta_medica', 'otros_problemas_salud',
+            'primera_menstruacion', 'edad_primera_menstruacion',
+        ]
 
 
 class AlumnoEscuelaOutputSerializer(serializers.ModelSerializer):
@@ -48,6 +90,7 @@ class AlumnoEscuelaOutputSerializer(serializers.ModelSerializer):
     domicilio = DomicilioAlumnoSerializer(read_only=True)
     escuela_nombre = serializers.CharField(source='escuela.nombre', read_only=True)
     operativos = serializers.SerializerMethodField()
+    antecedentes = serializers.SerializerMethodField()
 
     class Meta:
         model = Paciente
@@ -55,8 +98,15 @@ class AlumnoEscuelaOutputSerializer(serializers.ModelSerializer):
             'id', 'persona', 'domicilio', 'escuela', 'escuela_nombre', 'edad',
             'tiene_cud', 'tipo_cobertura', 'nombre_cobertura',
             'telefono_fijo', 'celular', 'consentimiento_aceptado',
-            'operativos',
+            'operativos', 'antecedentes',
         ]
+
+    def get_antecedentes(self, obj):
+        try:
+            ant = AntecedentePersonal.objects.get(paciente=obj)
+            return AntecedentePersonalOutputSerializer(ant).data
+        except AntecedentePersonal.DoesNotExist:
+            return None
 
     def get_operativos(self, obj):
         return [
@@ -111,3 +161,42 @@ class EscuelaAlumnosListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(AlumnoEscuelaOutputSerializer(alumno).data, status=status.HTTP_201_CREATED)
+
+
+class AlumnoAntecedentesView(APIView):
+    """GET/PATCH /alumnos/<pk>/antecedentes/ — antecedentes personales del alumno.
+
+    Solo para la escuela del alumno (o superadmin). Requiere cargarAntecedentesNino.
+    """
+    def get_permissions(self):
+        return [require_action('cargarAntecedentesNino')()]
+
+    def _get_paciente(self, request, pk):
+        escuela_id = request.user.escuela_id
+        if not escuela_id and not request.user.is_superuser:
+            return None
+        try:
+            paciente = Paciente.objects.select_related('escuela').get(pk=pk)
+        except Paciente.DoesNotExist:
+            return None
+        if not request.user.is_superuser and str(paciente.escuela_id) != str(escuela_id):
+            return None
+        return paciente
+
+    def get(self, request, pk):
+        paciente = self._get_paciente(request, pk)
+        if not paciente:
+            return Response({'detail': 'Alumno no encontrado o sin permiso.'}, status=status.HTTP_404_NOT_FOUND)
+        from apps.antecedentes.models import AntecedentePersonal
+        ant, _ = AntecedentePersonal.objects.get_or_create(paciente=paciente)
+        return Response(AntecedentePersonalOutputSerializer(ant).data)
+
+    def patch(self, request, pk):
+        paciente = self._get_paciente(request, pk)
+        if not paciente:
+            return Response({'detail': 'Alumno no encontrado o sin permiso.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = AntecedentePersonalInputSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        from .services.alumnos import actualizar_antecedentes_paciente
+        ant = actualizar_antecedentes_paciente(paciente, serializer.validated_data)
+        return Response(AntecedentePersonalOutputSerializer(ant).data)

@@ -13,10 +13,13 @@ from django.shortcuts import get_object_or_404
 
 from apps.antecedentes.models import AntecedenteFamiliarTutor
 from apps.tutores.models import Tutor
-from apps.usuarios.action_resolution import effective_actions, effective_menu_actions
+from apps.usuarios.action_resolution import effective_actions
 from apps.usuarios.models import PasswordResetCode, Usuario
 from apps.usuarios.permissions import require_action
+from apps.personas.models import Persona
 from apps.usuarios.serializers import (
+    ChangePasswordSerializer,
+    MePatchSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     UsuarioAyudanteSerializer,
@@ -49,43 +52,87 @@ class LogoutView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+def _me_payload(user):
+    persona = getattr(user, "persona", None)
+    tutor = Tutor.objects.filter(usuario=user).first()
+    antecedentes_completos = False
+    if tutor:
+        antecedentes_completos = AntecedenteFamiliarTutor.objects.filter(tutor=tutor).exists()
+    roles = [
+        {"name": r.rol, "label": r.rol.capitalize()}
+        for r in user.roles.all()
+    ]
+    return {
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "nombre": getattr(persona, "nombre", "") or "",
+            "apellido": getattr(persona, "apellido", "") or "",
+            "is_staff": user.is_staff,
+            "tutor_id": str(tutor.id) if tutor else None,
+            "consentimiento_aceptado": tutor.consentimiento_aceptado if tutor else False,
+            "antecedentes_familiares_completos": antecedentes_completos,
+            "escuela_id": str(user.escuela_id) if user.escuela_id else None,
+            "escuela_nombre": user.escuela.nombre if user.escuela_id else None,
+        },
+        "roles": roles,
+        "actions": effective_actions(user),
+        "meta": {
+            "version": "1",
+            "permissions_synced_at": timezone.now().isoformat(),
+        },
+    }
+
+
 class MeView(APIView):
     """GET /auth/me/ — contrato congelado: user + roles + actions + meta."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        return Response(_me_payload(request.user))
+
+    def patch(self, request):
+        serializer = MePatchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         user = request.user
         persona = getattr(user, "persona", None)
-        tutor = Tutor.objects.filter(usuario=user).first()
-        antecedentes_completos = False
-        if tutor:
-            antecedentes_completos = AntecedenteFamiliarTutor.objects.filter(tutor=tutor).exists()
+        data = serializer.validated_data
+        # Si no tiene Persona, la creamos con dni temporal (se completa luego)
+        if persona is None:
+            persona = Persona.objects.create(
+                nombre=data.get("nombre", ""),
+                apellido=data.get("apellido", ""),
+                dni=f"tmp-{user.id}",
+                sexo="otro",
+                fecha_nacimiento="2000-01-01",
+            )
+            user.persona = persona
+            user.save(update_fields=["persona"])
+        else:
+            if "nombre" in data:
+                persona.nombre = data["nombre"]
+            if "apellido" in data:
+                persona.apellido = data["apellido"]
+            persona.save(update_fields=["nombre", "apellido", "updated_at"])
+        return Response(_me_payload(user))
 
-        roles = [
-            {"name": r.rol, "label": r.rol.capitalize()}
-            for r in user.roles.all()
-        ]
-        data = {
-            "user": {
-                "id": str(user.id),
-                "email": user.email,
-                "nombre": getattr(persona, "nombre", "") or "",
-                "apellido": getattr(persona, "apellido", "") or "",
-                "is_staff": user.is_staff,
-                "tutor_id": str(tutor.id) if tutor else None,
-                "consentimiento_aceptado": tutor.consentimiento_aceptado if tutor else False,
-                "antecedentes_familiares_completos": antecedentes_completos,
-                "escuela_id": str(user.escuela_id) if user.escuela_id else None,
-                "escuela_nombre": user.escuela.nombre if user.escuela_id else None,
-            },
-            "roles": roles,
-            "actions": effective_menu_actions(user),
-            "meta": {
-                "version": "1",
-                "permissions_synced_at": timezone.now().isoformat(),
-            },
-        }
-        return Response(data)
+
+class ChangePasswordView(APIView):
+    """POST /auth/change-password/ — cambio con old_password."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        if not user.check_password(serializer.validated_data["old_password"]):
+            return Response(
+                {"old_password": ["La contraseña actual es incorrecta."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user.set_password(serializer.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        return Response({"detail": "Contraseña actualizada correctamente."})
 
 
 def _enviar_codigo_reset(email):

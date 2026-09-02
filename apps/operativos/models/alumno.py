@@ -45,6 +45,7 @@ class OperativoAlumno(BaseModel):
     escuela_dificultad_lenguaje = models.BooleanField(default=False)
     escuela_bajo_tratamiento = models.BooleanField(default=False)
     escuela_completado = models.BooleanField(default=False)
+    antecedentes_completado = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'operativos_alumnos'
@@ -75,4 +76,4 @@ class OperativoAlumno(BaseModel):
         except (OperativoAlumno.evaluacion_odontologica.RelatedObjectDoesNotExist, AttributeError):
             odontologica_ok = False
 
-        return bool(medica_ok and odontologica_ok and self.escuela_completado)
+        return bool(medica_ok and odontologica_ok and self.escuela_completado and self.antecedentes_completado)

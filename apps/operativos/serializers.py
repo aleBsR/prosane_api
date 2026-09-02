@@ -4,6 +4,27 @@ from .models import (
     EvaluacionMedica, EvaluacionOdontologica,
 )
 
+PIEZAS_PERMANENTES = {
+    '18', '17', '16', '15', '14', '13', '12', '11',
+    '21', '22', '23', '24', '25', '26', '27', '28',
+    '48', '47', '46', '45', '44', '43', '42', '41',
+    '31', '32', '33', '34', '35', '36', '37', '38',
+}
+PIEZAS_TEMPORARIAS = {
+    '55', '54', '53', '52', '51', '61', '62', '63', '64', '65',
+    '85', '84', '83', '82', '81', '71', '72', '73', '74', '75',
+}
+CARAS = {'oclusal', 'mesial', 'distal', 'vestibular', 'lingual'}
+ESTADOS_GENERALES = {
+    'ausente', 'perdido', 'extraido', 'corona', 'protesis', 'implante',
+    'a_extraer', 'fractura_total',
+}
+ESTADOS_CARA = {
+    'caries', 'restauracion', 'sellador', 'fractura', 'a_tratar', 'tratada',
+}
+ESTADOS_RAIZ = {'conducto_realizado', 'conducto_pendiente'}
+ESTADOS_INCOMPATIBLES = {'ausente', 'perdido', 'extraido'}
+
 
 class OperativoProfesionalSerializer(serializers.ModelSerializer):
     profesional_email = serializers.EmailField(
@@ -72,7 +93,7 @@ class OperativoAlumnoSerializer(serializers.ModelSerializer):
             'apellido', 'nombre', 'tipo_dni', 'dni',
             'fecha_nacimiento', 'sexo', 'estado', 'observaciones',
             'completo', 'medica_completada', 'odontologica_completada',
-            'escuela_completado',
+            'escuela_completado', 'antecedentes_completado',
         ]
         read_only_fields = ['id', 'operativo']
 
@@ -119,6 +140,55 @@ class EvaluacionMedicaSerializer(serializers.ModelSerializer):
 
 
 class EvaluacionOdontologicaSerializer(serializers.ModelSerializer):
+    def validate_odontograma(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('El odontograma debe ser un objeto.')
+
+        piezas_validas = PIEZAS_PERMANENTES | PIEZAS_TEMPORARIAS
+        for numero, pieza in value.items():
+            numero = str(numero)
+            if numero not in piezas_validas:
+                raise serializers.ValidationError(f'Pieza dental inválida: {numero}.')
+            if not isinstance(pieza, dict):
+                raise serializers.ValidationError(f'La pieza {numero} debe ser un objeto.')
+
+            denticion = pieza.get('denticion')
+            denticion_esperada = (
+                'permanente' if numero in PIEZAS_PERMANENTES else 'temporaria'
+            )
+            if denticion not in (None, denticion_esperada):
+                raise serializers.ValidationError(
+                    f'La pieza {numero} no pertenece a dentición {denticion_esperada}.'
+                )
+
+            general = pieza.get('estado_general') or ''
+            if general and general not in ESTADOS_GENERALES:
+                raise serializers.ValidationError(
+                    f'Estado general inválido para la pieza {numero}.'
+                )
+            caras = pieza.get('caras') or {}
+            if not isinstance(caras, dict) or set(caras) - CARAS:
+                raise serializers.ValidationError(f'Caras inválidas para la pieza {numero}.')
+            if general in ESTADOS_INCOMPATIBLES and caras:
+                raise serializers.ValidationError(
+                    f'La pieza {numero} no puede tener caras si está {general}.'
+                )
+            for cara, estado in caras.items():
+                if estado and estado not in ESTADOS_CARA:
+                    raise serializers.ValidationError(
+                        f'Estado inválido en {numero}/{cara}.'
+                    )
+            raiz = pieza.get('raiz') or ''
+            if general in ESTADOS_INCOMPATIBLES and raiz:
+                raise serializers.ValidationError(
+                    f'La pieza {numero} no puede tener estado de raíz si está {general}.'
+                )
+            if raiz and raiz not in ESTADOS_RAIZ:
+                raise serializers.ValidationError(f'Estado de raíz inválido para la pieza {numero}.')
+            if 'notas' in pieza and not isinstance(pieza['notas'], str):
+                raise serializers.ValidationError(f'Las notas de la pieza {numero} deben ser texto.')
+        return value
+
     class Meta:
         model = EvaluacionOdontologica
         fields = [

@@ -1,3 +1,4 @@
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -142,4 +143,25 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         if code_obj is None:
             raise serializers.ValidationError('El código es inválido o expiró.')
         self.code_obj = code_obj
+        return attrs
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """POST /auth/change-password/ — cambio autenticado."""
+    old_password = serializers.CharField()
+    new_password = serializers.CharField(min_length=6)
+
+    def validate_new_password(self, value):
+        validate_password(value, self.context.get('request') and self.context['request'].user)
+        return value
+
+
+class MePatchSerializer(serializers.Serializer):
+    """PATCH /auth/me/ — edita nombre/apellido de la Persona del usuario."""
+    nombre = serializers.CharField(required=False, allow_blank=True, max_length=256)
+    apellido = serializers.CharField(required=False, allow_blank=True, max_length=256)
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError('Enviá al menos nombre o apellido.')
         return attrs

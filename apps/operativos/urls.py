@@ -19,4 +19,7 @@ urlpatterns = [
     path('<uuid:pk>/alumnos/<uuid:alumno_pk>/evaluacion-medica/', views.EvaluacionMedicaView.as_view(), name='operativo-alumno-evaluacion-medica'),
     path('<uuid:pk>/alumnos/<uuid:alumno_pk>/evaluacion-odontologica/', views.EvaluacionOdontologicaView.as_view(), name='operativo-alumno-evaluacion-odontologica'),
     path('<uuid:pk>/alumnos/<uuid:alumno_pk>/seccion-escuela/', views.SeccionEscuelaView.as_view(), name='operativo-alumno-seccion-escuela'),
+    path('<uuid:pk>/alumnos/<uuid:alumno_pk>/constancia/', views.ConstanciaAlumnoView.as_view(), name='operativo-alumno-constancia'),
+    path('<uuid:pk>/alumnos/<uuid:alumno_pk>/datos/', views.OperativoAlumnoDatosView.as_view(), name='operativo-alumno-datos'),
+    path('<uuid:pk>/export/', views.ExportOperativoView.as_view(), name='operativo-export'),
 ]
