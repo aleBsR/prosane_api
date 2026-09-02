@@ -22,6 +22,16 @@ from .serializers import (
 from . import queries, services
 
 
+def _auto_evaluar_si_completo(alumno: OperativoAlumno):
+    """Si el alumno quedó completo (E+A+M+O) y está en presente, pasarlo a evaluado automáticamente."""
+    try:
+        if alumno.estado == OperativoAlumno.PRESENTE and alumno.completo:
+            alumno.estado = OperativoAlumno.EVALUADO
+            alumno.save(update_fields=['estado', 'updated_at'])
+    except Exception:
+        pass
+
+
 # ──────────────────────────────────────────────
 #  Operativos CRUD
 # ──────────────────────────────────────────────
@@ -233,7 +243,7 @@ class OperativoAlumnoListCreateView(APIView):
 
     def get(self, request, pk):
         operativo = queries.obtener_operativo_visible(request.user, pk)
-        qs = OperativoAlumno.objects.filter(operativo=operativo)
+        qs = OperativoAlumno.objects.filter(operativo=operativo).order_by('apellido', 'nombre', 'dni')
         estado = request.query_params.get('estado')
         if estado:
             qs = qs.filter(estado=estado)
@@ -277,6 +287,16 @@ class OperativoAlumnoDetailView(APIView):
             services.exigir_operativo_mutable(alumno.operativo)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
+        # Evaluado es automático: no permitir marcar manualmente si no está completo
+        nuevo_estado = (request.data or {}).get('estado')
+        if nuevo_estado == OperativoAlumno.EVALUADO and not alumno.completo:
+            # Refrescar flags por si el cliente tiene cache vieja
+            alumno.refresh_from_db()
+            if not alumno.completo:
+                return Response(
+                    {'error': 'No se puede marcar como evaluado hasta completar E, A, M y O. El estado evaluado es automático.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         serializer = OperativoAlumnoEstadoSerializer(alumno, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -375,6 +395,9 @@ class EvaluacionMedicaView(APIView):
             fecha_evaluacion=timezone.now(),
             completada=True,
         )
+        # Auto-evaluado si con esta carga quedó completo (E+A+M+O)
+        alumno.refresh_from_db()
+        _auto_evaluar_si_completo(alumno)
         return Response(serializer.data)
 
 
@@ -439,6 +462,8 @@ class EvaluacionOdontologicaView(APIView):
             fecha_evaluacion=timezone.now(),
             completada=True,
         )
+        alumno.refresh_from_db()
+        _auto_evaluar_si_completo(alumno)
         return Response(serializer.data)
 
 
@@ -478,6 +503,8 @@ class SeccionEscuelaView(APIView):
         serializer = SeccionEscuelaSerializer(alumno, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save(escuela_completado=True)
+        alumno.refresh_from_db()
+        _auto_evaluar_si_completo(alumno)
         return Response(serializer.data)
 
 
@@ -707,6 +734,8 @@ class OperativoAlumnoDatosView(APIView):
 
         alumno.antecedentes_completado = True
         alumno.save(update_fields=['antecedentes_completado'])
+        alumno.refresh_from_db()
+        _auto_evaluar_si_completo(alumno)
 
         return self.get(request, pk, alumno_pk)
 

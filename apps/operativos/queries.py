@@ -16,19 +16,20 @@ def _roles_usuario(user):
 def operativos_visibles_para_usuario(user):
     """Devuelve el queryset de operativos que el usuario puede listar.
 
-    - superuser: todos.
-    - ayudante: los que creó.
-    - medico/odontologo: los donde está asignado.
+    - superuser / superadmin: todos.
+    - ayudante / escuela: los que creó, los de su escuela, o los creados por superadmin.
+    - medico / odontologo: los donde está asignado.
     - otros: ninguno.
     """
-    if user.is_superuser:
-        return Operativo.objects.all()
-
     roles = _roles_usuario(user)
+
+    if user.is_superuser or 'superadmin' in roles:
+        return Operativo.objects.all()
 
     if roles & {'ayudante', 'escuela'}:
         from django.db.models import Q
         filtro = Q(created_by=user)
+        filtro |= Q(created_by__is_superuser=True)
         if getattr(user, 'escuela_id', None):
             filtro |= Q(escuela_id=user.escuela_id)
         return Operativo.objects.filter(filtro).distinct()
@@ -46,13 +47,17 @@ def obtener_operativo_visible(user, operativo_id):
     """
     operativo = get_object_or_404(Operativo, pk=operativo_id)
 
-    if user.is_superuser:
-        return operativo
-
     roles = _roles_usuario(user)
 
+    if user.is_superuser or 'superadmin' in roles:
+        return operativo
+
     if roles & {'ayudante', 'escuela'}:
-        if operativo.created_by == user or (getattr(user, 'escuela_id', None) and user.escuela_id == operativo.escuela_id):
+        if (
+            operativo.created_by == user
+            or (operativo.created_by and operativo.created_by.is_superuser)
+            or (getattr(user, 'escuela_id', None) and user.escuela_id == operativo.escuela_id)
+        ):
             return operativo
 
     if roles & {'medico', 'odontologo'}:
