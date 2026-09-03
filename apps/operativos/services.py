@@ -270,29 +270,32 @@ def _parse_fecha(value):
         return None
 
 
-def _buscar_paciente_por_dni(dni):
+def _buscar_paciente_por_dni(dni, escuela_id=None):
+    """Busca Paciente por DNI, opcionalmente filtrado por escuela."""
     persona_id = Persona.objects.filter(dni=dni).values_list('id', flat=True).first()
     if not persona_id:
         return None
-    return Paciente.objects.filter(persona_id=persona_id).first()
+    qs = Paciente.objects.filter(persona_id=persona_id)
+    if escuela_id is not None:
+        qs = qs.filter(escuela_id=escuela_id)
+    return qs.first()
 
 
 def _asegurar_paciente_para_operativo(operativo, dni, apellido, nombre, tipo_dni, fecha_nacimiento, sexo, curso):
     """Asegura que exista un Paciente para la escuela del operativo.
 
     Usado por importar_csv para que los alumnos del operativo también aparezcan
-    en 'Alumnos de mi escuela' (Paciente con escuela_id). Si ya existe un
-    Paciente para ese dni (en cualquier escuela) se reutiliza; si no, se crea
-    Persona + Domicilio + Paciente + AntecedentePersonal.
+    en 'Alumnos de mi escuela' (Paciente con escuela_id). Reutiliza Persona por DNI
+    pero crea un Paciente por escuela (un mismo DNI puede estar en varias escuelas).
+    Si ya existe un Paciente para ese dni Y esa escuela se reutiliza; si no, se crea
+    uno nuevo para esa escuela.
     """
-    # Reusar Paciente existente por dni (si ya hay uno en cualquier escuela)
-    paciente = _buscar_paciente_por_dni(dni)
+    # 1) Reusar Paciente existente para esa misma escuela
+    paciente = _buscar_paciente_por_dni(dni, escuela_id=operativo.escuela_id)
     if paciente is not None:
-        # Si el paciente no tiene escuela, asignar la del operativo
-        if not paciente.escuela_id:
-            paciente.escuela_id = operativo.escuela_id
-            paciente.save(update_fields=['escuela'])
         return paciente
+    # 2) Si existe Paciente con mismo DNI en otra escuela, no reutilizar: crear uno nuevo para esta escuela
+    #    (Persona se reutiliza, Paciente es por escuela)
 
     # Crear Persona si no existe
     try:

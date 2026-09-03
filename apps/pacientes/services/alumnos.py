@@ -1,7 +1,7 @@
 from django.db import transaction
 
 from apps.antecedentes.models import AntecedentePersonal
-from apps.escuelas.models import Curso
+from apps.escuelas.models import Curso, Escuela
 from apps.operativos.models import Operativo, OperativoAlumno
 from apps.pacientes.models import Paciente
 from apps.personas.models import Domicilio, Persona
@@ -30,7 +30,18 @@ def crear_alumno_escuela(escuela_id, data):
         if curso is None:
             raise AlumnoEscuelaError('El curso no pertenece a tu escuela.', field='curso_id')
     if operativo_id and not curso_id:
-        raise AlumnoEscuelaError('Elegí un curso para asociar el alumno al operativo.', field='curso_id')
+        # Plurigrado: permitir sin curso y usar/crear curso por defecto "Plurigrado"
+        escuela_obj = Escuela.objects.filter(id=escuela_id).first()
+        if escuela_obj and escuela_obj.plurigrado_rural:
+            # Buscar o crear curso plurigrado por defecto
+            curso, _ = Curso.objects.get_or_create(
+                escuela_id=escuela_id,
+                sala_grado_anio='Plurigrado',
+                division='Única',
+                defaults={'ciclo_lectivo': operativo.fecha.year if operativo else 2026, 'nivel': ''},
+            )
+        else:
+            raise AlumnoEscuelaError('Elegí un curso para asociar el alumno al operativo.', field='curso_id')
     if operativo is not None and operativo.estado not in (Operativo.BORRADOR, Operativo.CONFIRMADO):
         raise AlumnoEscuelaError('Solo se puede asociar alumnos en operativos en borrador o confirmado.', field='operativo_id')
     persona_data = dict(data['persona'])

@@ -17,7 +17,8 @@ def operativos_visibles_para_usuario(user):
     """Devuelve el queryset de operativos que el usuario puede listar.
 
     - superuser / superadmin: todos.
-    - ayudante / escuela: los que creó, los de su escuela, o los creados por superadmin.
+    - escuela: solo los de su escuela.
+    - ayudante: los que creó o los creados por superadmin (gestión).
     - medico / odontologo: los donde está asignado.
     - otros: ninguno.
     """
@@ -26,7 +27,13 @@ def operativos_visibles_para_usuario(user):
     if user.is_superuser or 'superadmin' in roles:
         return Operativo.objects.all()
 
-    if roles & {'ayudante', 'escuela'}:
+    if 'escuela' in roles:
+        escuela_id = getattr(user, 'escuela_id', None)
+        if escuela_id:
+            return Operativo.objects.filter(escuela_id=escuela_id)
+        return Operativo.objects.none()
+
+    if 'ayudante' in roles:
         from django.db.models import Q
         filtro = Q(created_by=user)
         filtro |= Q(created_by__is_superuser=True)
@@ -52,7 +59,12 @@ def obtener_operativo_visible(user, operativo_id):
     if user.is_superuser or 'superadmin' in roles:
         return operativo
 
-    if roles & {'ayudante', 'escuela'}:
+    if 'escuela' in roles:
+        if getattr(user, 'escuela_id', None) and user.escuela_id == operativo.escuela_id:
+            return operativo
+        raise Http404
+
+    if 'ayudante' in roles:
         if (
             operativo.created_by == user
             or (operativo.created_by and operativo.created_by.is_superuser)
