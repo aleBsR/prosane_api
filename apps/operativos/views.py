@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from apps.usuarios.permissions import require_action
+from apps.usuarios.permissions import require_action, require_any_action
 from .models import (
     Operativo, OperativoProfesional, OperativoAlumno,
     EvaluacionMedica, EvaluacionOdontologica,
@@ -513,9 +513,11 @@ class OperativoAlumnoDatosView(APIView):
 
     Permite a escuela cargar/editar datos personales + antecedentes del Paciente
     vinculado al OperativoAlumno. Solo si el operativo pertenece a su escuela.
+    GET en solo lectura (finalizado) también para ayudante/superadmin con verOperativo.
     """
     def get_permissions(self):
-        # Reusa cargarAntecedentesNino (ya asignada a escuela) para datos completos
+        if self.request.method == 'GET':
+            return [require_any_action('cargarAntecedentesNino', 'verOperativo')()]
         return [require_action('cargarAntecedentesNino')()]
 
     def _get_objs(self, request, pk, alumno_pk):
