@@ -41,6 +41,8 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
+    must_change_password = models.BooleanField(default=False, db_column="must_change_password")
+    temporal_password_expires_at = models.DateTimeField(null=True, blank=True, db_column="temporal_expires_at")
 
     USERNAME_FIELD = "email"
     objects = UserManager()

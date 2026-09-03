@@ -1,4 +1,10 @@
+import secrets
+from datetime import timedelta
+
+from django.contrib.auth.password_validation import validate_password
+from django.core.mail import send_mail
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.profesionales.models import Profesional
@@ -6,6 +12,36 @@ from apps.profesionales.services.services_refeps import RefepsError, RefepsServi
 from apps.usuarios.models import Rol, RoleUsuario, Usuario
 
 ROLES_PROFESIONAL = ("medico", "odontologo")
+
+
+def _generar_temporal():
+    for _ in range(5):
+        cand = secrets.token_urlsafe(10)
+        try:
+            validate_password(cand)
+            return cand
+        except Exception:
+            continue
+    return secrets.token_urlsafe(12)
+
+
+def _enviar_temporal(usuario, temp):
+    try:
+        send_mail(
+            subject='Acceso PROSANE — contraseña temporal',
+            message=(
+                f'Hola,\n\n'
+                f'Te crearon un acceso en PROSANE ({usuario.email}).\n'
+                f'Contraseña temporal: {temp}\n'
+                f'Vence en 72 horas. Al ingresar el sistema te pedirá cambiarla.\n\n'
+                f'Ingresá en: https://prosane.salta.gob.ar/login\n'
+            ),
+            from_email=None,
+            recipient_list=[usuario.email],
+            fail_silently=True,
+        )
+    except Exception:
+        pass
 
 
 class ProfesionalSerializer(serializers.ModelSerializer):
@@ -32,7 +68,7 @@ class ProfesionalCreateSerializer(serializers.Serializer):
     """
 
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, required=False, min_length=6)
     rol = serializers.ChoiceField(choices=ROLES_PROFESIONAL)
     matricula = serializers.CharField(max_length=256)
     nombre = serializers.CharField(max_length=256, required=False, allow_blank=True)
@@ -49,7 +85,8 @@ class ProfesionalCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         email = validated_data["email"]
-        password = validated_data["password"]
+        validated_data.pop("password", None)
+        temp = _generar_temporal()
         rol_name = validated_data["rol"]
         matricula = validated_data["matricula"]
         nombre = validated_data.get("nombre") or ""
@@ -61,7 +98,12 @@ class ProfesionalCreateSerializer(serializers.Serializer):
             apellido = apellido or refeps.get("apellido", "") or ""
 
         with transaction.atomic():
-            usuario = Usuario.objects.create_user(email=email, password=password)
+            usuario = Usuario.objects.create_user(
+                email=email,
+                password=temp,
+                must_change_password=True,
+                temporal_password_expires_at=timezone.now() + timedelta(hours=72),
+            )
             rol, _ = Rol.objects.get_or_create(rol=rol_name)
             RoleUsuario.objects.create(id_user=usuario, id_rol=rol)
             Profesional.objects.create(
@@ -70,17 +112,16 @@ class ProfesionalCreateSerializer(serializers.Serializer):
                 nombre=nombre or None,
                 apellido=apellido or None,
             )
+        _enviar_temporal(usuario, temp)
         return usuario
 
     def update(self, instance, validated_data):
-        password = validated_data.pop("password", None)
+        validated_data.pop("password", None)
         rol_name = validated_data.pop("rol", None)
         email = validated_data.pop("email", None)
         is_active = validated_data.pop("is_active", None)
         if email:
             instance.email = email
-        if password:
-            instance.set_password(password)
         if is_active is not None:
             instance.is_active = is_active
         instance.save()

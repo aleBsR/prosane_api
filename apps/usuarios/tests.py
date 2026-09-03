@@ -235,7 +235,7 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
             "verOperativo", "crearOperativo", "editarOperativo",
             "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
             "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
-            "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
+            "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela", "cargarAntecedentesNino",
             "verGestionUsuarios",
             "gestionarUsuariosEscuela", "gestionarAyudantes", "gestionarProfesionales",
         })
@@ -346,7 +346,6 @@ class UsuariosEscuelaApiTest(BaseAuthFixtureTest):
     def test_crear_usuario_escuela(self):
         res = self.client.post(self._list_url(), {
             "email": "nueva@escuela.test",
-            "password": "clave123",
             "escuela": str(self.escuela.id),
         }, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
@@ -355,14 +354,20 @@ class UsuariosEscuelaApiTest(BaseAuthFixtureTest):
         usuario = Usuario.objects.get(email="nueva@escuela.test")
         self.assertTrue(usuario.roles.filter(rol="escuela").exists())
         self.assertEqual(usuario.escuela_id, self.escuela.id)
-        self.assertTrue(usuario.check_password("clave123"))
+        # Ahora la contraseña es temporal generada, no "clave123"
+        self.assertTrue(usuario.must_change_password)
+        self.assertIsNotNone(usuario.temporal_password_expires_at)
+        self.assertFalse(usuario.check_password("clave123"))
 
-    def test_crear_sin_password_falla(self):
+    def test_crear_sin_password_genera_temporal(self):
+        # Ahora sin password debe generar temporal y no fallar (antes era 400)
         res = self.client.post(self._list_url(), {
-            "email": "nueva@escuela.test",
+            "email": "nueva2@escuela.test",
             "escuela": str(self.escuela.id),
         }, format="json")
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        usuario = Usuario.objects.get(email="nueva2@escuela.test")
+        self.assertTrue(usuario.must_change_password)
 
     def test_crear_email_duplicado_falla(self):
         res = self.client.post(self._list_url(), {
@@ -372,8 +377,9 @@ class UsuariosEscuelaApiTest(BaseAuthFixtureTest):
         }, format="json")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_patch_reasigna_escuela_y_password(self):
+    def test_patch_reasigna_escuela_sin_tocar_password(self):
         usuario = Usuario.objects.get(email="escuela@prosane.test")
+        old_hash = usuario.password
         res = self.client.patch(self._detail_url(usuario.pk), {
             "escuela": str(self.escuela.id),
             "password": "nuevaClave99",
@@ -381,7 +387,9 @@ class UsuariosEscuelaApiTest(BaseAuthFixtureTest):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         usuario.refresh_from_db()
         self.assertEqual(usuario.escuela_id, self.escuela.id)
-        self.assertTrue(usuario.check_password("nuevaClave99"))
+        # El admin no puede pisar la contraseña por este endpoint (solo el propio usuario vía /change-password)
+        self.assertEqual(usuario.password, old_hash)
+        self.assertFalse(usuario.check_password("nuevaClave99"))
 
     def test_delete_desactiva_la_cuenta(self):
         usuario = Usuario.objects.get(email="escuela@prosane.test")
@@ -507,17 +515,19 @@ class UsuariosAyudantesApiTest(BaseAuthFixtureTest):
     def test_crear_usuario_ayudante(self):
         res = self.client.post(self._list_url(), {
             "email": "nuevo@ayudante.test",
-            "password": "clave123",
         }, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertEqual(res.data["rol"], "ayudante")
         usuario = Usuario.objects.get(email="nuevo@ayudante.test")
         self.assertTrue(usuario.roles.filter(rol="ayudante").exists())
-        self.assertTrue(usuario.check_password("clave123"))
+        self.assertTrue(usuario.must_change_password)
+        self.assertFalse(usuario.check_password("clave123"))
 
-    def test_crear_sin_password_falla(self):
-        res = self.client.post(self._list_url(), {"email": "nuevo@ayudante.test"}, format="json")
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+    def test_crear_sin_password_genera_temporal_ayudante(self):
+        res = self.client.post(self._list_url(), {"email": "nuevo2@ayudante.test"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        usuario = Usuario.objects.get(email="nuevo2@ayudante.test")
+        self.assertTrue(usuario.must_change_password)
 
     def test_crear_email_duplicado_falla(self):
         res = self.client.post(self._list_url(), {
@@ -525,14 +535,16 @@ class UsuariosAyudantesApiTest(BaseAuthFixtureTest):
         }, format="json")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_patch_password_y_estado(self):
+    def test_patch_password_ignorado_solo_cambia_estado(self):
         usuario = Usuario.objects.get(email="ayudante@prosane.test")
+        old_hash = usuario.password
         res = self.client.patch(self._detail_url(usuario.pk), {
             "password": "nuevaClave99", "is_active": False,
         }, format="json")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         usuario.refresh_from_db()
-        self.assertTrue(usuario.check_password("nuevaClave99"))
+        self.assertEqual(usuario.password, old_hash)
+        self.assertFalse(usuario.check_password("nuevaClave99"))
         self.assertFalse(usuario.is_active)
 
     def test_delete_desactiva_la_cuenta(self):

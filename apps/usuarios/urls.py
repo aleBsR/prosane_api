@@ -15,6 +15,8 @@ path('auth/logout/', views.LogoutView.as_view(), name='auth-logout'),
     path('auth/token/refresh/', views.RefreshView.as_view(), name='auth-token-refresh'),
     path('usuarios/escuelas/', views.UsuariosEscuelaListCreateView.as_view(), name='usuarios-escuela-list-create'),
     path('usuarios/escuelas/<uuid:pk>/', views.UsuarioEscuelaDetailView.as_view(), name='usuario-escuela-detail'),
+    path('usuarios/escuelas/<uuid:pk>/resend-temp/', views.UsuarioEscuelaResendTempView.as_view(), name='usuario-escuela-resend-temp'),
     path('usuarios/ayudantes/', views.UsuariosAyudantesListCreateView.as_view(), name='usuarios-ayudantes-list-create'),
     path('usuarios/ayudantes/<uuid:pk>/', views.UsuarioAyudanteDetailView.as_view(), name='usuario-ayudante-detail'),
+    path('usuarios/ayudantes/<uuid:pk>/resend-temp/', views.UsuarioAyudanteResendTempView.as_view(), name='usuario-ayudante-resend-temp'),
 ]

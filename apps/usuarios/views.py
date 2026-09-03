@@ -74,6 +74,8 @@ def _me_payload(user):
             "antecedentes_familiares_completos": antecedentes_completos,
             "escuela_id": str(user.escuela_id) if user.escuela_id else None,
             "escuela_nombre": user.escuela.nombre if user.escuela_id else None,
+            "must_change_password": bool(getattr(user, 'must_change_password', False)),
+            "temporal_password_expires_at": user.temporal_password_expires_at.isoformat() if getattr(user, 'temporal_password_expires_at', None) else None,
         },
         "roles": roles,
         "actions": effective_actions(user),
@@ -118,7 +120,7 @@ class MeView(APIView):
 
 
 class ChangePasswordView(APIView):
-    """POST /auth/change-password/ — cambio con old_password."""
+    """POST /auth/change-password/ — cambio con old_password. Desbloquea must_change_password."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -131,7 +133,9 @@ class ChangePasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         user.set_password(serializer.validated_data["new_password"])
-        user.save(update_fields=["password"])
+        user.must_change_password = False
+        user.temporal_password_expires_at = None
+        user.save(update_fields=["password", "must_change_password", "temporal_password_expires_at"])
         return Response({"detail": "Contraseña actualizada correctamente."})
 
 
@@ -192,10 +196,55 @@ class PasswordResetConfirmView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         user.set_password(serializer.validated_data['new_password'])
-        user.save(update_fields=['password'])
+        user.must_change_password = False
+        user.temporal_password_expires_at = None
+        user.save(update_fields=['password', 'must_change_password', 'temporal_password_expires_at'])
         serializer.code_obj.used_at = timezone.now()
-        serializer.code_obj.save(update_fields=['used_at', 'updated_at'])
+        serializer.code_obj.save(update_fields=['used_at'])
         return Response({'detail': 'Tu contraseña fue restablecida correctamente.'})
+
+
+class UsuarioEscuelaResendTempView(APIView):
+    """POST /usuarios/escuelas/<pk>/resend-temp/ — reenvía contraseña temporal (72h)."""
+    permission_classes = [require_action('gestionarUsuariosEscuela')]
+
+    def post(self, request, pk):
+        usuario = get_object_or_404(
+            Usuario.objects.filter(roles__rol='escuela').distinct(), pk=pk,
+        )
+        from django.contrib.auth.password_validation import validate_password
+        temp = None
+        for _ in range(5):
+            cand = secrets.token_urlsafe(10)
+            try:
+                validate_password(cand, usuario)
+                temp = cand
+                break
+            except Exception:
+                continue
+        if temp is None:
+            temp = secrets.token_urlsafe(12)
+        usuario.set_password(temp)
+        usuario.must_change_password = True
+        usuario.temporal_password_expires_at = timezone.now() + timedelta(hours=72)
+        usuario.save(update_fields=['password', 'must_change_password', 'temporal_password_expires_at'])
+        try:
+            send_mail(
+                subject='Acceso PROSANE — nueva contraseña temporal',
+                message=(
+                    f'Hola,\n\n'
+                    f'Te reenviaron un acceso en PROSANE ({usuario.email}).\n'
+                    f'Nueva contraseña temporal: {temp}\n'
+                    f'Vence en 72 horas. Al ingresar el sistema te pedirá cambiarla.\n\n'
+                    f'Ingresá en: https://prosane.salta.gob.ar/login\n'
+                ),
+                from_email=None,
+                recipient_list=[usuario.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+        return Response({'detail': 'Contraseña temporal reenviada.'})
 
 
 class UsuariosAyudantesListCreateView(APIView):
@@ -248,6 +297,49 @@ class UsuarioAyudanteDetailView(APIView):
         usuario.is_active = False
         usuario.save(update_fields=['is_active'])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UsuarioAyudanteResendTempView(APIView):
+    """POST /usuarios/ayudantes/<pk>/resend-temp/ — reenvía temporal (72h)."""
+    permission_classes = [require_action('gestionarAyudantes')]
+
+    def post(self, request, pk):
+        usuario = get_object_or_404(
+            Usuario.objects.filter(roles__rol='ayudante').distinct(), pk=pk,
+        )
+        from django.contrib.auth.password_validation import validate_password
+        temp = None
+        for _ in range(5):
+            cand = secrets.token_urlsafe(10)
+            try:
+                validate_password(cand, usuario)
+                temp = cand
+                break
+            except Exception:
+                continue
+        if temp is None:
+            temp = secrets.token_urlsafe(12)
+        usuario.set_password(temp)
+        usuario.must_change_password = True
+        usuario.temporal_password_expires_at = timezone.now() + timedelta(hours=72)
+        usuario.save(update_fields=['password', 'must_change_password', 'temporal_password_expires_at'])
+        try:
+            send_mail(
+                subject='Acceso PROSANE — nueva contraseña temporal',
+                message=(
+                    f'Hola,\n\n'
+                    f'Te reenviaron un acceso en PROSANE ({usuario.email}).\n'
+                    f'Nueva contraseña temporal: {temp}\n'
+                    f'Vence en 72 horas. Al ingresar el sistema te pedirá cambiarla.\n\n'
+                    f'Ingresá en: https://prosane.salta.gob.ar/login\n'
+                ),
+                from_email=None,
+                recipient_list=[usuario.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+        return Response({'detail': 'Contraseña temporal reenviada.'})
 
 
 class UsuariosEscuelaListCreateView(APIView):
