@@ -90,11 +90,40 @@ def crear_operativo(escuela_id, fecha, **kwargs):
 # ──────────────────────────────────────────────
 #  Asignar profesional
 # ──────────────────────────────────────────────
-def asignar_profesional(operativo_id, profesional_id, rol):
+ROLES_PROFESIONALES = ('medico', 'odontologo')
+
+
+def _rol_profesional(profesional_id, rol=None):
+    """Resuelve y valida el rol en el operativo desde los roles del usuario.
+
+    Si no se indica rol y el profesional tiene uno solo, se deriva
+    automáticamente. Si tiene ambos, hay que indicarlo. El rol indicado
+    debe coincidir con uno real del profesional.
+    """
+    from apps.usuarios.models import Usuario
+    try:
+        usuario = Usuario.objects.prefetch_related('roles').get(pk=profesional_id)
+    except Usuario.DoesNotExist:
+        raise ValueError('Profesional no encontrado')
+    roles = [r.rol for r in usuario.roles.all() if r.rol in ROLES_PROFESIONALES]
+    if rol is None:
+        if len(roles) == 1:
+            return roles[0]
+        if not roles:
+            raise ValueError('El usuario no tiene rol de médico ni odontólogo')
+        raise ValueError('El profesional tiene ambos roles: indicá médico u odontólogo')
+    if rol not in roles:
+        raise ValueError(f'El profesional no tiene el rol {rol}')
+    return rol
+
+
+def asignar_profesional(operativo_id, profesional_id, rol=None):
     operativo = get_object_or_404(Operativo, pk=operativo_id)
 
     if operativo.estado != Operativo.BORRADOR:
         raise ValueError('Solo se pueden asignar profesionales en estado borrador')
+
+    rol = _rol_profesional(profesional_id, rol)
 
     if tiene_conflicto_fecha(profesional_id, operativo.fecha, exclude_operativo_id=operativo_id):
         raise ValueError(
@@ -347,10 +376,16 @@ def _normalizar_grado(grado: str) -> str:
     """Normaliza el grado para evitar duplicados por distinto símbolo de grado.
 
     El CSV usa '1°' (U+00B0) y el seed usa '1º' (U+00BA); se unifican a '°'.
+    Un número solo ('1') equivale a '1°' (autocompletado de la app).
     """
+    import re
+
     if not grado:
         return grado
-    return grado.strip().replace('\u00ba', '\u00b0').replace('\u00B0', '\u00b0')
+    v = grado.strip().replace('\u00ba', '\u00b0').replace('\u00B0', '\u00b0')
+    if re.fullmatch(r'\d{1,2}', v):
+        return f'{v}\u00b0'
+    return v
 
 
 def _buscar_o_crear_curso(escuela_id, grado, division, ciclo_lectivo):
@@ -361,15 +396,15 @@ def _buscar_o_crear_curso(escuela_id, grado, division, ciclo_lectivo):
     Normaliza el grado para no duplicar por '°' vs 'º'.
     """
     grado_norm = _normalizar_grado(grado)
-    division_norm = division.strip() if division else division
+    division_norm = division.strip().upper() if division else division
     if not grado_norm and not division_norm:
         return None
     # Buscar por grado normalizado (en DB puede haber con 'º' o '°', probamos ambos)
     # Primero intenta con el normalizado; si no encuentra, busca con la variante.
     curso = Curso.objects.filter(
         escuela_id=escuela_id,
-        sala_grado_anio=grado_norm,
-        division=division_norm,
+        sala_grado_anio__iexact=grado_norm,
+        division__iexact=division_norm,
     ).first()
     if curso:
         return curso
@@ -378,8 +413,8 @@ def _buscar_o_crear_curso(escuela_id, grado, division, ciclo_lectivo):
     if variante != grado_norm:
         curso = Curso.objects.filter(
             escuela_id=escuela_id,
-            sala_grado_anio=variante,
-            division=division_norm,
+            sala_grado_anio__iexact=variante,
+            division__iexact=division_norm,
         ).first()
         if curso:
             # Actualizar a la forma normalizada para futuro

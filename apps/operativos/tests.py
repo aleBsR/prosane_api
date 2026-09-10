@@ -37,19 +37,23 @@ def _create_ayudante(**kwargs):
 def _create_medico(**kwargs):
     global _user_counter
     _user_counter += 1
-    return Usuario.objects.create_user(
+    user = Usuario.objects.create_user(
         email=kwargs.get('email', f'medico{_user_counter}@test.com'),
         password='pass1234',
     )
+    _asignar_rol(user, 'medico')
+    return user
 
 
 def _create_odontologo(**kwargs):
     global _user_counter
     _user_counter += 1
-    return Usuario.objects.create_user(
+    user = Usuario.objects.create_user(
         email=kwargs.get('email', f'odontologo{_user_counter}@test.com'),
         password='pass1234',
     )
+    _asignar_rol(user, 'odontologo')
+    return user
 
 
 def _create_escuela():
@@ -330,6 +334,29 @@ class ServiciosTest(TestCase):
         services.asignar_profesional(op.id, self.medico.id, 'medico')
         with self.assertRaises(ValueError):
             services.asignar_profesional(op.id, self.medico.id, 'odontologo')
+
+    def test_asignar_profesional_deriva_rol(self):
+        op = _create_operativo(self.escuela)
+        rel = services.asignar_profesional(op.id, self.odontologo.id)
+        self.assertEqual(rel.rol_en_operativo, 'odontologo')
+
+    def test_asignar_profesional_rol_distinto_da_error(self):
+        op = _create_operativo(self.escuela)
+        with self.assertRaises(ValueError):
+            services.asignar_profesional(op.id, self.medico.id, 'odontologo')
+
+    def test_asignar_profesional_ambos_roles_exige_rol(self):
+        _asignar_rol(self.medico, 'odontologo')
+        op = _create_operativo(self.escuela)
+        with self.assertRaises(ValueError):
+            services.asignar_profesional(op.id, self.medico.id)
+        rel = services.asignar_profesional(op.id, self.medico.id, 'odontologo')
+        self.assertEqual(rel.rol_en_operativo, 'odontologo')
+
+    def test_asignar_profesional_sin_rol_profesional_da_error(self):
+        op = _create_operativo(self.escuela)
+        with self.assertRaises(ValueError):
+            services.asignar_profesional(op.id, self.ayudante.id)
 
     def test_asignar_profesional_solo_borrador(self):
         op = _create_operativo(self.escuela)
@@ -853,6 +880,25 @@ class OperativoAPITest(APITestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_asignar_profesional_sin_rol_deriva(self):
+        op = self._create_operativo()
+        data = {'profesional': str(self.odontologo.id)}
+        response = self.client.post(
+            f'/api/v1/operativos/{op.id}/profesionales/asignar/',
+            data, format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['rol_en_operativo'], 'odontologo')
+
+    def test_asignar_profesional_rol_distinto_da_409(self):
+        op = self._create_operativo()
+        data = {'profesional': str(self.medico.id), 'rol_en_operativo': 'odontologo'}
+        response = self.client.post(
+            f'/api/v1/operativos/{op.id}/profesionales/asignar/',
+            data, format='json',
+        )
+        self.assertEqual(response.status_code, 409)
+
     def test_remover_profesional(self):
         op = self._create_operativo()
         rel = services.asignar_profesional(op.id, self.medico.id, 'medico')
@@ -879,6 +925,13 @@ class OperativoAPITest(APITestCase):
         self.assertEqual(len(response.data), 1)
 
     def test_create_alumno(self):
+        # El alta de alumnos en el operativo exige importarNominaOperativo
+        # (solo escuela y superadmin).
+        from apps.usuarios.models import Usuario
+        admin = Usuario.objects.create_superuser(
+            email='admin-alumno@test.com', password='test1234',
+        )
+        self.client.force_authenticate(user=admin)
         op = self._create_operativo()
         data = {'apellido': 'López', 'nombre': 'Carlos', 'dni': '34567890'}
         response = self.client.post(
@@ -905,8 +958,13 @@ class OperativoAPITest(APITestCase):
         )
         self.assertEqual(response.status_code, 204)
 
-    # ─── Importar CSV ───
+    # ─── Importar CSV (solo escuela y superadmin) ───
     def test_importar_csv_api(self):
+        from apps.usuarios.models import Usuario
+        admin = Usuario.objects.create_superuser(
+            email='admin-csv@test.com', password='test1234',
+        )
+        self.client.force_authenticate(user=admin)
         op = self._create_operativo()
         csv_content = 'apellido,nombre,tipo_dni,dni,fecha_nacimiento,sexo\nGarcía,Juan,DNI,12345678,15/03/2015,M\n'
         csv_file = SimpleUploadedFile(
@@ -921,6 +979,11 @@ class OperativoAPITest(APITestCase):
         self.assertEqual(response.data['creados'], 1)
 
     def test_importar_csv_sin_archivo(self):
+        from apps.usuarios.models import Usuario
+        admin = Usuario.objects.create_superuser(
+            email='admin-csv2@test.com', password='test1234',
+        )
+        self.client.force_authenticate(user=admin)
         op = self._create_operativo()
         response = self.client.post(
             f'/api/v1/operativos/{op.id}/alumnos/importar-csv/',
@@ -990,8 +1053,8 @@ class OperativoAPITest(APITestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-    def test_ayudante_no_importa_csv_en_operativo_de_otro(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+    def test_ayudante_no_importa_csv_sin_permiso(self):
+        op = self._create_operativo(created_by=self.ayudante)
         csv_content = 'apellido,nombre,tipo_dni,dni,fecha_nacimiento,sexo\nGarcía,Juan,DNI,12345678,15/03/2015,M\n'
         csv_file = SimpleUploadedFile(
             'alumnos.csv', csv_content.encode('utf-8-sig'),
@@ -1001,7 +1064,7 @@ class OperativoAPITest(APITestCase):
             f'/api/v1/operativos/{op.id}/alumnos/importar-csv/',
             {'archivo': csv_file}, format='multipart',
         )
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 403)
 
     def test_no_remover_profesional_de_operativo_confirmado(self):
         op = self._create_operativo()

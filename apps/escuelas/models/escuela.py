@@ -7,7 +7,7 @@ class Escuela(BaseModel):
     cue = models.CharField(max_length=20, unique=True, blank=True, null=True)
     ambito = models.CharField(max_length=20, blank=True, default='')
     sector_gestion = models.CharField(max_length=20, blank=True, default='')
-    modalidad_educativa = models.CharField(max_length=10, blank=True, default='')
+    modalidad_educativa = models.CharField(max_length=50, blank=True, default='')
     intercultural_bilingue = models.BooleanField(default=False)
     plurigrado_rural = models.BooleanField(default=False)
     domicilio = models.ForeignKey(

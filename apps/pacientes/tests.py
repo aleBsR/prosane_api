@@ -1,5 +1,8 @@
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from apps.pacientes.models import Paciente
 from apps.personas.models import Domicilio, Persona
@@ -7,7 +10,7 @@ from apps.escuelas.models import Escuela
 from apps.escuelas.models import Curso
 from apps.operativos.models import Operativo, OperativoAlumno
 from apps.tutores.models import Tutor
-from apps.usuarios.models import Usuario
+from apps.usuarios.models import Action, ActionRole, Rol, Usuario
 from apps.pacientes.services.alumnos import crear_alumno_escuela
 
 
@@ -77,3 +80,61 @@ class AlumnoEscuelaServiceTest(TestCase):
         alumno = OperativoAlumno.objects.get(operativo=operativo, paciente=paciente)
         self.assertEqual(alumno.curso_id, curso.id)
         self.assertEqual(alumno.dni, '70000002')
+
+
+class AlumnoEscuelaFiltroAPITest(APITestCase):
+    """GET /alumnos/?escuela_id= — solo superadmin; el resto usa su escuela."""
+
+    def setUp(self):
+        self.admin = Usuario.objects.create_superuser(
+            email='admin@test.com', password='test1234',
+        )
+        self.escuela_a = Escuela.objects.create(nombre='Escuela A')
+        self.escuela_b = Escuela.objects.create(nombre='Escuela B')
+        for escuela, dni in ((self.escuela_a, '70000101'), (self.escuela_b, '70000102')):
+            crear_alumno_escuela(escuela.id, {
+                'persona': {
+                    'nombre': 'Ana', 'apellido': 'Prueba', 'dni': dni,
+                    'tipo_dni': 'DNI', 'sexo': 'F', 'fecha_nacimiento': '2018-01-01',
+                },
+                'domicilio': {'localidad': 'Salta'},
+                'edad': 8,
+            })
+        self.url = reverse('escuela-alumnos-list-create')
+
+    def test_superadmin_filtra_por_escuela(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get(f'{self.url}?escuela_id={self.escuela_a.id}')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+
+    def test_superadmin_escuela_id_invalido_da_400(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get(f'{self.url}?escuela_id=no-es-uuid')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_superadmin_escuela_inexistente_da_404(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get(
+            f'{self.url}?escuela_id=00000000-0000-0000-0000-000000000000'
+        )
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_usuario_escuela_no_puede_filtrar_otra_escuela(self):
+        action = Action.objects.create(
+            name='verAlumnosEscuela', label='Ver', type='crud',
+            category='test', sort_order=1,
+        )
+        rol = Rol.objects.create(rol='escuela')
+        ActionRole.objects.create(role=rol, action=action)
+        usuario = Usuario.objects.create_user(
+            email='esc@test.com', password='test1234', escuela=self.escuela_a,
+        )
+        usuario.roles.add(rol)
+        self.client.force_authenticate(user=usuario)
+        res = self.client.get(f'{self.url}?escuela_id={self.escuela_b.id}')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        # Sin filtro sigue viendo solo su escuela.
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)

@@ -207,10 +207,12 @@ class OperativoProfesionalAssignView(APIView):
     def post(self, request, pk):
         operativo = queries.obtener_operativo_visible(request.user, pk)
         profesional_id = request.data.get('profesional')
+        # rol_en_operativo es opcional: si se omite se deriva del rol real
+        # del profesional (médico u odontólogo).
         rol = request.data.get('rol_en_operativo')
-        if not profesional_id or not rol:
+        if not profesional_id:
             return Response(
-                {'error': 'Se requieren profesional y rol_en_operativo'},
+                {'error': 'Se requiere profesional'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:

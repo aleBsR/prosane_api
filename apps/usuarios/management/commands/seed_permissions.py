@@ -31,7 +31,7 @@ ROLE_ACTIONS = {
         "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
         "verOperativo", "crearOperativo", "editarOperativo",
         "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
-        "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
+        "gestionarProfesionalesEnOperativo",
         "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
         "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
     ],

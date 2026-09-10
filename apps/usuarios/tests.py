@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 
 from apps.personas.models import Persona
 from apps.usuarios.models import Action, ActionRole, Rol
-from apps.usuarios.action_resolution import effective_actions
+from apps.usuarios.action_resolution import effective_actions, effective_menu_actions
 from apps.usuarios.permissions import require_action
 
 Usuario = get_user_model()
@@ -82,6 +82,63 @@ class SeedPermissionsTest(TestCase):
         self.assertTrue(ActionRole.objects.filter(role__rol="ayudante").exists())
 
 
+class MenuVisibilityTest(TestCase):
+    """Editar/eliminar escuela y editar operativo no van al menú de inicio,
+    pero siguen otorgando permiso (las opciones viven dentro de cada tarjeta)."""
+
+    @override_settings(SEEDS_ENABLED=True)
+    def test_crud_contextual_fuera_del_menu_con_permiso_intacto(self):
+        call_command("seed_permissions", verbosity=0)
+        user = Usuario.objects.create_user(
+            email="ayudante-menu@test.com", password="test1234",
+        )
+        user.roles.add(Rol.objects.get(rol="ayudante"))
+
+        menu = {a["name"] for a in effective_menu_actions(user)}
+        permisos = {a["name"] for a in effective_actions(user)}
+
+        for name in ("editarEscuela", "eliminarEscuela", "editarOperativo"):
+            self.assertNotIn(name, menu)
+            self.assertIn(name, permisos)
+
+        # Los accesos del menú siguen ahí.
+        self.assertIn("verEscuelas", menu)
+        self.assertIn("verOperativo", menu)
+        self.assertIn("crearEscuela", menu)
+        self.assertIn("crearOperativo", menu)
+
+    @override_settings(SEEDS_ENABLED=True)
+    def test_importar_csv_solo_escuela_y_superadmin(self):
+        call_command("seed_permissions", verbosity=0)
+        ayudante = Usuario.objects.create_user(
+            email="ayudante-csv@test.com", password="test1234",
+        )
+        ayudante.roles.add(Rol.objects.get(rol="ayudante"))
+        escuela = Usuario.objects.create_user(
+            email="escuela-csv@test.com", password="test1234",
+        )
+        escuela.roles.add(Rol.objects.get(rol="escuela"))
+
+        perms_ayudante = {a["name"] for a in effective_actions(ayudante)}
+        perms_escuela = {a["name"] for a in effective_actions(escuela)}
+        self.assertNotIn("importarNominaOperativo", perms_ayudante)
+        self.assertIn("importarNominaOperativo", perms_escuela)
+
+    @override_settings(SEEDS_ENABLED=True)
+    def test_registrar_alumno_fuera_del_menu_con_permiso_intacto(self):
+        # El alta vive dentro de "Alumnos de mi escuela": el tile sobra.
+        call_command("seed_permissions", verbosity=0)
+        escuela = Usuario.objects.create_user(
+            email="escuela-menu@test.com", password="test1234",
+        )
+        escuela.roles.add(Rol.objects.get(rol="escuela"))
+        menu = {a["name"] for a in effective_menu_actions(escuela)}
+        permisos = {a["name"] for a in effective_actions(escuela)}
+        self.assertNotIn("registrarAlumnoEscuela", menu)
+        self.assertIn("registrarAlumnoEscuela", permisos)
+        self.assertIn("verAlumnosEscuela", menu)
+
+
 class BaseAuthFixtureTest(APITestCase):
     """Base para tests que usan los usuarios de prueba del fixture.
 
@@ -141,7 +198,7 @@ class AuthAPITest(BaseAuthFixtureTest):
             "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
             "verOperativo", "crearOperativo", "editarOperativo",
             "confirmarOperativo", "finalizarOperativo", "iniciarOperativo", "cancelarOperativo",
-            "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
+            "gestionarProfesionalesEnOperativo",
             "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
             "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
         ])
@@ -207,10 +264,15 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
             "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
             "verOperativo", "crearOperativo", "editarOperativo",
             "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
-            "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
+            "gestionarProfesionalesEnOperativo",
             "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
             "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
         })
+
+    def test_me_escuela_tiene_importar_csv(self):
+        user = Usuario.objects.get(email="escuela@prosane.test")
+        actions = self._action_names(user)
+        self.assertIn("importarNominaOperativo", actions)
 
     def test_me_tutor_recibe_permisos_de_escuela_y_familia(self):
         user = Usuario.objects.get(email="tutor@prosane.test")

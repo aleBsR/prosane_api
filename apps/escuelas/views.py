@@ -73,6 +73,18 @@ class EscuelaDetailView(APIView):
 
     def delete(self, request, pk):
         escuela = self.get_object(pk)
+        # Prevé inconsistencias: no desactivar si quedan usuarios u
+        # operativos vinculados. Primero reasignar/eliminar esos.
+        if escuela.usuarios_escuela.exists():
+            return Response(
+                {'detail': 'No se puede eliminar: la escuela tiene usuarios asociados. Reasignálos a otra escuela primero.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if escuela.operativos.exists():
+            return Response(
+                {'detail': 'No se puede eliminar: la escuela tiene operativos asociados.'},
+                status=status.HTTP_409_CONFLICT,
+            )
         escuela.activa = False
         escuela.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -82,7 +94,10 @@ class MiEscuelaView(APIView):
     permission_classes = [require_action('verMiEscuela')]
 
     def get(self, request):
-        escuela = getattr(request.user, 'escuela', None)
+        # Resolución resiliente: si la escuela fue eliminada por otra vía
+        # (FK colgada), se responde 404 en vez de explotar con 500.
+        escuela_id = getattr(request.user, 'escuela_id', None)
+        escuela = Escuela.objects.filter(pk=escuela_id).first() if escuela_id else None
         if escuela is None:
             return Response(
                 {'detail': 'El usuario no tiene una escuela asignada.'},
@@ -121,7 +136,7 @@ class CursoListCreateView(APIView):
         escuela = self._escuela(request, escuela_pk)
         if escuela is None:
             return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = CursoSerializer(data=request.data)
+        serializer = CursoSerializer(data=request.data, context={'escuela': escuela})
         serializer.is_valid(raise_exception=True)
         serializer.save(escuela=escuela)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -150,7 +165,7 @@ class CursoDetailView(APIView):
         curso = self._curso(request, escuela_pk, pk)
         if curso is None:
             return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = CursoSerializer(curso, data=request.data)
+        serializer = CursoSerializer(curso, data=request.data, context={'escuela': curso.escuela})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -159,7 +174,7 @@ class CursoDetailView(APIView):
         curso = self._curso(request, escuela_pk, pk)
         if curso is None:
             return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = CursoSerializer(curso, data=request.data, partial=True)
+        serializer = CursoSerializer(curso, data=request.data, partial=True, context={'escuela': curso.escuela})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)

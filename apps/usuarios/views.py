@@ -12,6 +12,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.shortcuts import get_object_or_404
 
 from apps.antecedentes.models import AntecedenteFamiliarTutor
+from apps.escuelas.models import Escuela
 from apps.tutores.models import Tutor
 from apps.usuarios.action_resolution import effective_actions
 from apps.usuarios.models import PasswordResetCode, Usuario
@@ -62,6 +63,12 @@ def _me_payload(user):
         {"name": r.rol, "label": r.rol.capitalize()}
         for r in user.roles.all()
     ]
+    # Resolución resiliente: si la escuela fue eliminada por otra vía
+    # (FK colgada), se informa sin escuela en vez de explotar con 500.
+    escuela = (
+        Escuela.objects.filter(pk=user.escuela_id).first()
+        if user.escuela_id else None
+    )
     return {
         "user": {
             "id": str(user.id),
@@ -72,8 +79,8 @@ def _me_payload(user):
             "tutor_id": str(tutor.id) if tutor else None,
             "consentimiento_aceptado": tutor.consentimiento_aceptado if tutor else False,
             "antecedentes_familiares_completos": antecedentes_completos,
-            "escuela_id": str(user.escuela_id) if user.escuela_id else None,
-            "escuela_nombre": user.escuela.nombre if user.escuela_id else None,
+            "escuela_id": str(escuela.id) if escuela else None,
+            "escuela_nombre": escuela.nombre if escuela else None,
             "must_change_password": bool(getattr(user, 'must_change_password', False)),
             "temporal_password_expires_at": user.temporal_password_expires_at.isoformat() if getattr(user, 'temporal_password_expires_at', None) else None,
         },

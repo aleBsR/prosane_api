@@ -1,3 +1,5 @@
+import uuid
+
 from rest_framework import serializers, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -5,6 +7,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
 from apps.antecedentes.models import AntecedentePersonal
+from apps.escuelas.models import Escuela
 from apps.usuarios.permissions import require_action
 from .models import Paciente
 from .services.alumnos import (
@@ -140,9 +143,32 @@ class EscuelaAlumnosListCreateView(APIView):
         return request.user.escuela_id
 
     def get(self, request):
-        escuela_id = self._escuela_id(request)
-        if not escuela_id:
-            return Response({'detail': 'El usuario no tiene una escuela asignada.'}, status=status.HTTP_404_NOT_FOUND)
+        # ?escuela_id= permite al superadmin ver los alumnos de una escuela
+        # puntual (detalle de escuela). El resto sigue con su propia escuela.
+        param = request.query_params.get('escuela_id')
+        if param:
+            if not request.user.is_superuser:
+                return Response(
+                    {'detail': 'Sin permiso para ver alumnos de otra escuela.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            try:
+                escuela_uuid = uuid.UUID(str(param))
+            except (ValueError, AttributeError):
+                return Response(
+                    {'detail': 'escuela_id inválido.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not Escuela.objects.filter(pk=escuela_uuid).exists():
+                return Response(
+                    {'detail': 'Escuela no encontrada.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            escuela_id = escuela_uuid
+        else:
+            escuela_id = self._escuela_id(request)
+            if not escuela_id:
+                return Response({'detail': 'El usuario no tiene una escuela asignada.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(AlumnoEscuelaOutputSerializer(
             listar_alumnos_escuela(escuela_id), many=True,
         ).data)

@@ -203,7 +203,7 @@ class EscuelaListSerializerTest(TestCase):
         s = EscuelaListSerializer(e)
         expected = {
             'id', 'nombre', 'cue', 'ambito', 'activa', 'localidad',
-            'usuarios_asociados',
+            'usuarios_asociados', 'plurigrado_rural',
         }
         self.assertEqual(set(s.data.keys()), expected)
 
@@ -265,6 +265,47 @@ class CursoSerializerTest(TestCase):
         s.save()
         c.refresh_from_db()
         self.assertEqual(c.sala_grado_anio, '2°')
+
+    def test_curso_duplicado_no_valido(self):
+        Curso.objects.create(
+            escuela=self.escuela, sala_grado_anio='1°', division='A', ciclo_lectivo=2026,
+        )
+        s = CursoSerializer(
+            data={'sala_grado_anio': '1°', 'division': 'A', 'ciclo_lectivo': 2026},
+            context={'escuela': self.escuela},
+        )
+        self.assertFalse(s.is_valid())
+        self.assertIn('non_field_errors', s.errors)
+
+    def test_curso_duplicado_insensible_a_mayusculas_y_simbolo_grado(self):
+        Curso.objects.create(
+            escuela=self.escuela, sala_grado_anio='1°', division='A', ciclo_lectivo=2026,
+        )
+        s = CursoSerializer(
+            data={'sala_grado_anio': '1º', 'division': 'a', 'ciclo_lectivo': 2026},
+            context={'escuela': self.escuela},
+        )
+        self.assertFalse(s.is_valid())
+
+    def test_curso_numero_solo_equivale_a_grado_con_simbolo(self):
+        Curso.objects.create(
+            escuela=self.escuela, sala_grado_anio='1°', division='A', ciclo_lectivo=2026,
+        )
+        s = CursoSerializer(
+            data={'sala_grado_anio': '1', 'division': 'A', 'ciclo_lectivo': 2026},
+            context={'escuela': self.escuela},
+        )
+        self.assertFalse(s.is_valid())
+
+    def test_curso_mismo_grado_distinto_ciclo_es_valido(self):
+        Curso.objects.create(
+            escuela=self.escuela, sala_grado_anio='1°', division='A', ciclo_lectivo=2026,
+        )
+        s = CursoSerializer(
+            data={'sala_grado_anio': '1°', 'division': 'A', 'ciclo_lectivo': 2027},
+            context={'escuela': self.escuela},
+        )
+        self.assertTrue(s.is_valid(), msg=s.errors)
 
 
 class EscuelaAPITest(APITestCase):
@@ -338,6 +379,17 @@ class EscuelaAPITest(APITestCase):
         res = self.client.post(url, {'cue': 'CUE001'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_crear_escuela_modalidad_larga(self):
+        # La app envía la modalidad como texto libre (ej. "Primaria común").
+        url = reverse('escuela-list-create')
+        res = self.client.post(
+            url,
+            {'nombre': 'Escuela Nueva', 'modalidad_educativa': 'Primaria común'},
+            format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data['modalidad_educativa'], 'Primaria común')
+
     def test_ver_detalle_escuela(self):
         escuela = Escuela.objects.create(nombre='Test Detalle')
         url = reverse('escuela-detail', args=[escuela.id])
@@ -368,6 +420,57 @@ class EscuelaAPITest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
         escuela.refresh_from_db()
         self.assertFalse(escuela.activa)
+
+    def test_eliminar_escuela_con_usuarios_da_409(self):
+        from apps.usuarios.models import Rol
+        escuela = Escuela.objects.create(nombre='Test')
+        usuario = Usuario.objects.create_user(
+            email='esc409@test.com', password='test1234', escuela=escuela,
+        )
+        usuario.roles.add(Rol.objects.create(rol='escuela-test-409'))
+        url = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.delete(url)
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        escuela.refresh_from_db()
+        self.assertTrue(escuela.activa)
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.escuela_id, escuela.id)
+
+    def test_eliminar_escuela_con_operativos_da_409(self):
+        from apps.operativos.models import Operativo
+        escuela = Escuela.objects.create(nombre='Test')
+        Operativo.objects.create(escuela=escuela, fecha='2026-09-01')
+        url = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.delete(url)
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        escuela.refresh_from_db()
+        self.assertTrue(escuela.activa)
+
+    def test_mi_escuela_con_escuela_eliminada_da_404(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        usuario = Usuario.objects.create_superuser(
+            email='esc404@test.com', password='test1234', escuela=escuela,
+        )
+        escuela.delete()  # soft-delete: la FK queda colgada
+        self.client.force_authenticate(
+            user=Usuario.objects.get(pk=usuario.pk),
+        )
+        res = self.client.get(reverse('mi-escuela'))
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_me_con_escuela_eliminada_no_explota(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        usuario = Usuario.objects.create_superuser(
+            email='escme@test.com', password='test1234', escuela=escuela,
+        )
+        escuela.delete()  # soft-delete: la FK queda colgada
+        self.client.force_authenticate(
+            user=Usuario.objects.get(pk=usuario.pk),
+        )
+        res = self.client.get(reverse('auth-me'))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIsNone(res.data['user']['escuela_id'])
+        self.assertIsNone(res.data['user']['escuela_nombre'])
 
     def test_404_escuela_inexistente(self):
         url = reverse('escuela-detail', args=['00000000-0000-0000-0000-000000000000'])
@@ -589,6 +692,71 @@ class EscuelaAPITest(APITestCase):
         self.assertEqual(Curso.objects.count(), 0)
         self.assertEqual(Curso.all_objects.count(), 1)
         self.assertIsNotNone(Curso.all_objects.get(pk=curso.pk).deleted_at)
+
+    def test_crear_curso_duplicado_da_400(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('curso-list-create', args=[escuela.id])
+        data = {'sala_grado_anio': '1°', 'division': 'A', 'ciclo_lectivo': 2026}
+        res = self.client.post(url, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        res = self.client.post(url, data, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_crear_curso_con_anio_duplica_contra_sin_anio(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('curso-list-create', args=[escuela.id])
+        res = self.client.post(
+            url, {'sala_grado_anio': '1°', 'division': 'A', 'ciclo_lectivo': 2026}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        res = self.client.post(
+            url, {'sala_grado_anio': '1°', 'division': 'A'}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_crear_curso_sin_anio_duplica_contra_con_anio(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('curso-list-create', args=[escuela.id])
+        res = self.client.post(
+            url, {'sala_grado_anio': '1°', 'division': 'A'}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        res = self.client.post(
+            url, {'sala_grado_anio': '1', 'division': 'a', 'ciclo_lectivo': 2026}, format= 'json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_crear_curso_duplicado_variante_minuscula_da_400(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        url = reverse('curso-list-create', args=[escuela.id])
+        res = self.client.post(
+            url, {'sala_grado_anio': '1°', 'division': 'A', 'ciclo_lectivo': 2026}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        res = self.client.post(
+            url, {'sala_grado_anio': '1º', 'division': 'a', 'ciclo_lectivo': 2026}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_actualizar_curso_a_duplicado_da_400(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        Curso.objects.create(escuela=escuela, sala_grado_anio='1°', division='A', ciclo_lectivo=2026)
+        curso2 = Curso.objects.create(escuela=escuela, sala_grado_anio='2°', division='A', ciclo_lectivo=2026)
+        url = reverse('curso-detail', args=[escuela.id, curso2.id])
+        res = self.client.patch(url, {'sala_grado_anio': '1°'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_crear_curso_tras_eliminar_permite_reutilizar(self):
+        escuela = Escuela.objects.create(nombre='Test')
+        curso = Curso.objects.create(escuela=escuela, sala_grado_anio='1°', division='A', ciclo_lectivo=2026)
+        url_detalle = reverse('curso-detail', args=[escuela.id, curso.id])
+        res = self.client.delete(url_detalle)
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        url = reverse('curso-list-create', args=[escuela.id])
+        res = self.client.post(
+            url, {'sala_grado_anio': '1°', 'division': 'A', 'ciclo_lectivo': 2026}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
 
 class EscuelaAPIPermissionTest(APITestCase):
