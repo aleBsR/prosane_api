@@ -4,7 +4,7 @@
     "pk": "c0000000-0000-0000-0000-000000000001",
     "fields": {
       "email": "superadmin@prosane.test",
-      "password": "pbkdf2_sha256$1200000$n41d8WPH78WLygcBM3sMAc$QbyVT4CC+i6kHOC8qKOMOb6J+W4sk6AulixA+uYKL9o=",
+      "password": "pbkdf2_sha256$1200000$yfLMCrTTzV8WX98Sh86b9D$xg0KRdF/N7O3cYJ0w1eeMdk8TCjLs3iiAwvOmVrzDkQ=",
       "is_superuser": true,
       "is_staff": true,
       "is_active": true,
@@ -16,7 +16,7 @@
     "pk": "c0000000-0000-0000-0000-000000000002",
     "fields": {
       "email": "medico@prosane.test",
-      "password": "pbkdf2_sha256$1200000$n41d8WPH78WLygcBM3sMAc$QbyVT4CC+i6kHOC8qKOMOb6J+W4sk6AulixA+uYKL9o=",
+      "password": "pbkdf2_sha256$1200000$yfLMCrTTzV8WX98Sh86b9D$xg0KRdF/N7O3cYJ0w1eeMdk8TCjLs3iiAwvOmVrzDkQ=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -28,7 +28,7 @@
     "pk": "c0000000-0000-0000-0000-000000000003",
     "fields": {
       "email": "odontologo@prosane.test",
-      "password": "pbkdf2_sha256$1200000$n41d8WPH78WLygcBM3sMAc$QbyVT4CC+i6kHOC8qKOMOb6J+W4sk6AulixA+uYKL9o=",
+      "password": "pbkdf2_sha256$1200000$yfLMCrTTzV8WX98Sh86b9D$xg0KRdF/N7O3cYJ0w1eeMdk8TCjLs3iiAwvOmVrzDkQ=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -40,7 +40,7 @@
     "pk": "c0000000-0000-0000-0000-000000000004",
     "fields": {
       "email": "ayudante@prosane.test",
-      "password": "pbkdf2_sha256$1200000$n41d8WPH78WLygcBM3sMAc$QbyVT4CC+i6kHOC8qKOMOb6J+W4sk6AulixA+uYKL9o=",
+      "password": "pbkdf2_sha256$1200000$yfLMCrTTzV8WX98Sh86b9D$xg0KRdF/N7O3cYJ0w1eeMdk8TCjLs3iiAwvOmVrzDkQ=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -52,7 +52,7 @@
     "pk": "c0000000-0000-0000-0000-000000000005",
     "fields": {
       "email": "tutor@prosane.test",
-      "password": "pbkdf2_sha256$1200000$n41d8WPH78WLygcBM3sMAc$QbyVT4CC+i6kHOC8qKOMOb6J+W4sk6AulixA+uYKL9o=",
+      "password": "pbkdf2_sha256$1200000$yfLMCrTTzV8WX98Sh86b9D$xg0KRdF/N7O3cYJ0w1eeMdk8TCjLs3iiAwvOmVrzDkQ=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -64,7 +64,7 @@
     "pk": "c0000000-0000-0000-0000-000000000006",
     "fields": {
       "email": "medico1@prosane.test",
-      "password": "pbkdf2_sha256$1200000$n41d8WPH78WLygcBM3sMAc$QbyVT4CC+i6kHOC8qKOMOb6J+W4sk6AulixA+uYKL9o=",
+      "password": "pbkdf2_sha256$1200000$yfLMCrTTzV8WX98Sh86b9D$xg0KRdF/N7O3cYJ0w1eeMdk8TCjLs3iiAwvOmVrzDkQ=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -76,7 +76,7 @@
     "pk": "c0000000-0000-0000-0000-000000000007",
     "fields": {
       "email": "odontologo1@prosane.test",
-      "password": "pbkdf2_sha256$1200000$n41d8WPH78WLygcBM3sMAc$QbyVT4CC+i6kHOC8qKOMOb6J+W4sk6AulixA+uYKL9o=",
+      "password": "pbkdf2_sha256$1200000$yfLMCrTTzV8WX98Sh86b9D$xg0KRdF/N7O3cYJ0w1eeMdk8TCjLs3iiAwvOmVrzDkQ=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -88,7 +88,7 @@
     "pk": "c0000000-0000-0000-0000-000000000008",
     "fields": {
       "email": "escuela@prosane.test",
-      "password": "pbkdf2_sha256$1200000$n41d8WPH78WLygcBM3sMAc$QbyVT4CC+i6kHOC8qKOMOb6J+W4sk6AulixA+uYKL9o=",
+      "password": "pbkdf2_sha256$1200000$yfLMCrTTzV8WX98Sh86b9D$xg0KRdF/N7O3cYJ0w1eeMdk8TCjLs3iiAwvOmVrzDkQ=",
       "is_superuser": false,
       "is_staff": false,
       "is_active": true,
@@ -97,7 +97,7 @@
   },
   {
     "model": "usuarios.roleusuario",
-    "pk": 9000,
+    "pk": 9001,
     "fields": {
       "id_user": "c0000000-0000-0000-0000-000000000001",
       "id_rol": "67ba3b5f-c7ff-5102-ada9-75f18dd16c97",
@@ -107,7 +107,7 @@
   },
   {
     "model": "usuarios.roleusuario",
-    "pk": 9001,
+    "pk": 9002,
     "fields": {
       "id_user": "c0000000-0000-0000-0000-000000000002",
       "id_rol": "5c638269-50ea-54f6-a3aa-286f34f75066",
@@ -117,7 +117,7 @@
   },
   {
     "model": "usuarios.roleusuario",
-    "pk": 9002,
+    "pk": 9003,
     "fields": {
       "id_user": "c0000000-0000-0000-0000-000000000003",
       "id_rol": "b9f5e0af-0b35-5289-a72a-0aa03b0c435b",
@@ -127,7 +127,7 @@
   },
   {
     "model": "usuarios.roleusuario",
-    "pk": 9003,
+    "pk": 9004,
     "fields": {
       "id_user": "c0000000-0000-0000-0000-000000000004",
       "id_rol": "4e9d0fc2-d6b8-5c60-a421-bd7d1176f40f",
@@ -137,7 +137,7 @@
   },
   {
     "model": "usuarios.roleusuario",
-    "pk": 9004,
+    "pk": 9005,
     "fields": {
       "id_user": "c0000000-0000-0000-0000-000000000005",
       "id_rol": "74c54bfb-2000-5947-97c0-83331367adbb",
@@ -147,7 +147,7 @@
   },
   {
     "model": "usuarios.roleusuario",
-    "pk": 9005,
+    "pk": 9006,
     "fields": {
       "id_user": "c0000000-0000-0000-0000-000000000006",
       "id_rol": "5c638269-50ea-54f6-a3aa-286f34f75066",
@@ -157,7 +157,7 @@
   },
   {
     "model": "usuarios.roleusuario",
-    "pk": 9006,
+    "pk": 9007,
     "fields": {
       "id_user": "c0000000-0000-0000-0000-000000000007",
       "id_rol": "b9f5e0af-0b35-5289-a72a-0aa03b0c435b",
@@ -167,7 +167,7 @@
   },
   {
     "model": "usuarios.roleusuario",
-    "pk": 9007,
+    "pk": 9008,
     "fields": {
       "id_user": "c0000000-0000-0000-0000-000000000008",
       "id_rol": "57e58978-2fc1-5be7-9486-5e160596fffe",

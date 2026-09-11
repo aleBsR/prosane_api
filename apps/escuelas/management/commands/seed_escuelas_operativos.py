@@ -88,14 +88,19 @@ class Command(BaseCommand):
                 defaults={**data, 'domicilio': dom},
             )
             if created:
-                for nivel, grado, division in CURSOS:
-                    Curso.objects.get_or_create(
-                        escuela=escuela,
-                        sala_grado_anio=grado,
-                        division=division,
-                        defaults={'nivel': nivel, 'ciclo_lectivo': 2026},
-                    )
-                self.stdout.write(f'  + escuela: {escuela.nombre}')
+                if data.get('plurigrado_rural'):
+                    # Plurigrado rural: no crea cursos; cada fila de la nómina
+                    # crea su curso de grado (sin división) al importar.
+                    self.stdout.write(f'  + escuela (plurigrado): {escuela.nombre}')
+                else:
+                    for nivel, grado, division in CURSOS:
+                        Curso.objects.get_or_create(
+                            escuela=escuela,
+                            sala_grado_anio=grado,
+                            division=division,
+                            defaults={'nivel': nivel, 'ciclo_lectivo': 2026},
+                        )
+                    self.stdout.write(f'  + escuela: {escuela.nombre}')
             else:
                 self.stdout.write(f'  = ya existía: {escuela.nombre}')
             escuelas.append(escuela)
@@ -116,11 +121,16 @@ class Command(BaseCommand):
             'ayudante': Usuario.objects.filter(email='ayudante@prosane.test').first(),
         }
 
-        csv_path = settings.BASE_DIR / 'nomina_alumnos_demo.csv'
-        csv_bytes = csv_path.read_bytes()
-
         for i, escuela in enumerate(escuelas):
             fecha = date(2026, 3, 9 + i)
+            csv_name = (
+                'nomina_plurigrado_demo.csv'
+                if escuela.plurigrado_rural
+                else 'nomina_alumnos_demo.csv'
+            )
+            csv_path = settings.BASE_DIR / csv_name
+            csv_bytes = csv_path.read_bytes()
+
             operativo, created = Operativo.objects.get_or_create(
                 escuela=escuela,
                 fecha=fecha,

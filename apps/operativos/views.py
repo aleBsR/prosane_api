@@ -1,3 +1,4 @@
+from django.db import IntegrityError, DataError
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
@@ -510,6 +511,127 @@ class SeccionEscuelaView(APIView):
         return Response(serializer.data)
 
 
+def _nombre_profesional(usuario):
+    """Nombre legible del profesional a partir de su Persona (o email)."""
+    if not usuario:
+        return ''
+    persona = usuario.persona
+    if persona:
+        nombre = ' '.join(p for p in [persona.nombre, persona.apellido] if p)
+        if nombre:
+            return nombre
+    return usuario.email or ''
+
+
+def _eval_medica_data(alumno):
+    """Datos de la evaluación médica del alumno para la ficha (o None)."""
+    try:
+        em = alumno.evaluacion_medica
+    except Exception:
+        return None
+    return {
+        'id': str(em.id),
+        'completada': em.completada,
+        'profesional': _nombre_profesional(em.profesional),
+        'fecha_evaluacion': em.fecha_evaluacion.isoformat() if em.fecha_evaluacion else None,
+        'examen_realizado': em.examen_realizado,
+        'motivo_no_examen': em.motivo_no_examen,
+        'lugar_examen': em.lugar_examen,
+        'trajo_carnet': em.trajo_carnet,
+        'carnet_completo': em.carnet_completo,
+        'vacunas_aplicadas': em.vacunas_aplicadas,
+        'vacunas_indicadas': em.vacunas_indicadas,
+        'peso': float(em.peso) if em.peso else None,
+        'talla': float(em.talla) if em.talla else None,
+        'imc': float(em.imc) if em.imc else None,
+        'percentil_talla': em.percentil_talla,
+        'percentil_imc': em.percentil_imc,
+        'pas': em.pas,
+        'pad': em.pad,
+        'presion_clasificacion': em.presion_clasificacion,
+        'agudeza_evaluada': em.agudeza_evaluada,
+        'ojo_derecho': em.ojo_derecho,
+        'ojo_izquierdo': em.ojo_izquierdo,
+        'usa_lentes': em.usa_lentes,
+        'audiometria_realizada': em.audiometria_realizada,
+        'audiometria_resultado': em.audiometria_resultado,
+        'hallazgos': em.hallazgos or {},
+        'derivaciones': em.derivaciones or {},
+    }
+
+
+def _eval_odontologica_data(alumno):
+    """Datos de la evaluación odontológica del alumno para la ficha (o None)."""
+    try:
+        eo = alumno.evaluacion_odontologica
+    except Exception:
+        return None
+    return {
+        'id': str(eo.id),
+        'completada': eo.completada,
+        'profesional': _nombre_profesional(eo.profesional),
+        'fecha_evaluacion': eo.fecha_evaluacion.isoformat() if eo.fecha_evaluacion else None,
+        'salud_bucal': eo.salud_bucal,
+        'lesiones_tejidos_blandos': eo.lesiones_tejidos_blandos,
+        'maloclusion': eo.maloclusion,
+        'fluorosis': eo.fluorosis,
+        'caries': eo.caries,
+        'otros': eo.otros,
+        'topicacion_fluor': eo.topicacion_fluor,
+        'ensenanza_cepillado': eo.ensenanza_cepillado,
+        'alta_basica': eo.alta_basica,
+        'cpo_c': eo.cpo_c,
+        'cpo_p': eo.cpo_p,
+        'cpo_o': eo.cpo_o,
+        'ceo_c': eo.ceo_c,
+        'ceo_e': eo.ceo_e,
+        'ceo_o': eo.ceo_o,
+        'odontograma': eo.odontograma or {},
+    }
+
+
+def _validar_longitudes_datos(data):
+    """Valida que los strings enviados al PATCH /datos/ no excedan max_length.
+
+    Evita 500 por DataError cuando un campo supera el límite del modelo
+    (localidad, nombre_cobertura, celular, etc.).
+    """
+    from apps.personas.models import Persona, Domicilio
+    from apps.pacientes.models import Paciente
+    from apps.antecedentes.models import AntecedentePersonal
+
+    bloques = []
+    snapshot = {f: data.get(f) for f in ('apellido', 'nombre', 'tipo_dni', 'dni', 'sexo') if f in data}
+    if snapshot:
+        bloques.append(('datos_personales', OperativoAlumno, snapshot))
+    persona = {f: data.get(f) for f in ('nombre', 'apellido', 'tipo_dni', 'dni', 'sexo') if f in data}
+    if persona:
+        bloques.append(('persona', Persona, persona))
+    paciente = {f: data.get(f) for f in ('tipo_cobertura', 'nombre_cobertura', 'telefono_fijo', 'celular') if f in data}
+    if paciente:
+        bloques.append(('paciente', Paciente, paciente))
+    if data.get('localidad'):
+        bloques.append(('domicilio', Domicilio, {'localidad': data['localidad']}))
+    if isinstance(data.get('antecedentes'), dict):
+        bloques.append(('antecedentes', AntecedentePersonal, data['antecedentes']))
+
+    errores = {}
+    for prefijo, modelo, valores in bloques:
+        for campo, valor in (valores or {}).items():
+            if not isinstance(valor, str):
+                continue
+            try:
+                field = modelo._meta.get_field(campo)
+            except Exception:
+                continue
+            max_length = getattr(field, 'max_length', None)
+            if max_length and len(valor) > max_length:
+                errores[f'{prefijo}.{campo}'] = (
+                    f'Excede la longitud máxima de {max_length} caracteres.'
+                )
+    return errores
+
+
 class OperativoAlumnoDatosView(APIView):
     """GET/PATCH datos completos del alumno para escuela (igual que tutor).
 
@@ -597,7 +719,10 @@ class OperativoAlumnoDatosView(APIView):
                     'primera_menstruacion': ant.primera_menstruacion if ant else 'NO',
                     'edad_primera_menstruacion': ant.edad_primera_menstruacion if ant else 0,
                 } if ant else None,
+                'evaluacion_medica': _eval_medica_data(alumno),
+                'evaluacion_odontologica': _eval_odontologica_data(alumno),
                 'escuela_completado': alumno.escuela_completado,
+                'antecedentes_completado': alumno.antecedentes_completado,
             }
             return Response(data)
         # Sin paciente: devolver snapshot para que escuela lo complete
@@ -617,6 +742,8 @@ class OperativoAlumnoDatosView(APIView):
             'persona': None,
             'domicilio': None,
             'antecedentes': None,
+            'evaluacion_medica': None,
+            'evaluacion_odontologica': None,
             'escuela_completado': alumno.escuela_completado,
             'antecedentes_completado': alumno.antecedentes_completado,
         })
@@ -628,118 +755,154 @@ class OperativoAlumnoDatosView(APIView):
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
         data = request.data or {}
-        # Actualizar snapshot del OperativoAlumno si vienen esos campos
-        for field in ['apellido', 'nombre', 'tipo_dni', 'dni', 'sexo']:
-            if field in data:
-                setattr(alumno, field, data[field])
-        if 'fecha_nacimiento' in data and data['fecha_nacimiento']:
-            try:
-                from datetime import datetime
-                alumno.fecha_nacimiento = datetime.strptime(data['fecha_nacimiento'], '%Y-%m-%d').date()
-            except Exception:
-                pass
-        if 'curso' in data:
-            try:
-                from apps.escuelas.models import Curso
-                if data['curso']:
-                    curso = Curso.objects.get(pk=data['curso'], escuela=operativo.escuela)
-                    alumno.curso = curso
-                else:
-                    alumno.curso = None
-            except Exception:
-                pass
-        alumno.save()
 
-        # Si tiene paciente, actualizar Paciente/Persona/Domicilio/Antecedentes
-        if alumno.paciente_id:
-            paciente = alumno.paciente
-            persona = paciente.persona
-            domicilio = paciente.domicilio
-            # Persona
-            if persona:
-                for f in ['nombre', 'apellido', 'dni', 'tipo_dni', 'sexo']:
-                    if f in data and data[f] not in (None, ''):
-                        setattr(persona, f, data[f])
-                if 'fecha_nacimiento' in data and data['fecha_nacimiento']:
-                    try:
-                        from datetime import datetime
-                        persona.fecha_nacimiento = datetime.strptime(data['fecha_nacimiento'], '%Y-%m-%d').date()
-                    except Exception:
-                        pass
-                persona.save()
-            # Paciente
-            for f in ['edad', 'tiene_cud', 'tipo_cobertura', 'nombre_cobertura', 'telefono_fijo', 'celular']:
-                if f in data:
-                    setattr(paciente, f, data[f])
-            paciente.save()
-            # Domicilio
-            if domicilio and 'localidad' in data:
-                domicilio.localidad = data['localidad'] or domicilio.localidad
-                domicilio.save()
-            # Antecedentes
-            if 'antecedentes' in data and isinstance(data['antecedentes'], dict):
-                from apps.antecedentes.models import AntecedentePersonal
-                ant, _ = AntecedentePersonal.objects.get_or_create(paciente=paciente)
-                for k, v in data['antecedentes'].items():
-                    if hasattr(ant, k):
-                        setattr(ant, k, v)
-                ant.save()
-        else:
-            # Sin paciente: crear uno nuevo con los datos enviados (como en importar_csv)
-            from apps.personas.models import Persona, Domicilio
-            from apps.pacientes.models import Paciente
-            from apps.antecedentes.models import AntecedentePersonal
-            # Crear persona
-            persona_data = {
-                'nombre': data.get('nombre') or alumno.nombre or '',
-                'apellido': data.get('apellido') or alumno.apellido or '',
-                'dni': data.get('dni') or alumno.dni,
-                'tipo_dni': data.get('tipo_dni') or alumno.tipo_dni or 'DNI',
-                'sexo': data.get('sexo') or alumno.sexo or 'otro',
-                'fecha_nacimiento': alumno.fecha_nacimiento or '2000-01-01',
-            }
+        # Evitar 500: DNI duplicado en el operativo y longitudes máximas
+        if data.get('dni'):
+            if OperativoAlumno.objects.filter(
+                operativo=operativo, dni=str(data['dni']).strip(),
+            ).exclude(pk=alumno.pk).exists():
+                return Response(
+                    {'error': 'Ya existe un alumno con ese DNI en el operativo.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+        errores_longitud = _validar_longitudes_datos(data)
+        if errores_longitud:
+            return Response(
+                {'error': 'Algunos campos exceden la longitud máxima permitida.', 'detalle': errores_longitud},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Actualizar snapshot del OperativoAlumno si vienen esos campos
+            for field in ['apellido', 'nombre', 'tipo_dni', 'dni', 'sexo']:
+                if field in data:
+                    setattr(alumno, field, data[field])
             if 'fecha_nacimiento' in data and data['fecha_nacimiento']:
                 try:
                     from datetime import datetime
-                    persona_data['fecha_nacimiento'] = datetime.strptime(data['fecha_nacimiento'], '%Y-%m-%d').date()
+                    alumno.fecha_nacimiento = datetime.strptime(data['fecha_nacimiento'], '%Y-%m-%d').date()
                 except Exception:
                     pass
-            persona = Persona.objects.create(**persona_data)
-            domicilio = Domicilio.objects.create(localidad=data.get('localidad') or '')
-            # Calcular edad
-            edad = data.get('edad') or 0
-            if not edad and persona.fecha_nacimiento:
+            if 'curso' in data:
                 try:
-                    from datetime import datetime as dt
-                    hoy = dt.now().date()
-                    edad = hoy.year - persona.fecha_nacimiento.year - ((hoy.month, hoy.day) < (persona.fecha_nacimiento.month, persona.fecha_nacimiento.day))
+                    from apps.escuelas.models import Curso
+                    if data['curso']:
+                        curso = Curso.objects.get(pk=data['curso'], escuela=operativo.escuela)
+                        alumno.curso = curso
+                    else:
+                        alumno.curso = None
                 except Exception:
-                    edad = 0
-            paciente = Paciente.objects.create(
-                escuela=operativo.escuela,
-                persona=persona,
-                domicilio=domicilio,
-                edad=edad,
-                tiene_cud=data.get('tiene_cud'),
-                tipo_cobertura=data.get('tipo_cobertura'),
-                nombre_cobertura=data.get('nombre_cobertura'),
-                telefono_fijo=data.get('telefono_fijo'),
-                celular=data.get('celular'),
-            )
-            AntecedentePersonal.objects.get_or_create(paciente=paciente)
-            if 'antecedentes' in data and isinstance(data['antecedentes'], dict):
-                ant, _ = AntecedentePersonal.objects.get_or_create(paciente=paciente)
-                for k, v in data['antecedentes'].items():
-                    if hasattr(ant, k):
-                        setattr(ant, k, v)
-                ant.save()
-            alumno.paciente = paciente
-            alumno.save(update_fields=['paciente'])
+                    pass
+            alumno.save()
 
-        alumno.antecedentes_completado = True
-        alumno.save(update_fields=['antecedentes_completado'])
-        alumno.refresh_from_db()
-        _auto_evaluar_si_completo(alumno)
+            # Si tiene paciente, actualizar Paciente/Persona/Domicilio/Antecedentes
+            if alumno.paciente_id:
+                paciente = alumno.paciente
+                persona = paciente.persona
+                domicilio = paciente.domicilio
+                # Persona
+                if persona:
+                    for f in ['nombre', 'apellido', 'dni', 'tipo_dni', 'sexo']:
+                        if f in data and data[f] not in (None, ''):
+                            setattr(persona, f, data[f])
+                    if 'fecha_nacimiento' in data and data['fecha_nacimiento']:
+                        try:
+                            from datetime import datetime
+                            persona.fecha_nacimiento = datetime.strptime(data['fecha_nacimiento'], '%Y-%m-%d').date()
+                        except Exception:
+                            pass
+                    persona.save()
+                # Paciente
+                for f in ['edad', 'tiene_cud', 'tipo_cobertura', 'nombre_cobertura', 'telefono_fijo', 'celular']:
+                    if f in data:
+                        setattr(paciente, f, data[f])
+                paciente.save()
+                # Domicilio
+                if domicilio and 'localidad' in data:
+                    domicilio.localidad = data['localidad'] or domicilio.localidad
+                    domicilio.save()
+                # Antecedentes
+                if 'antecedentes' in data and isinstance(data['antecedentes'], dict):
+                    from apps.antecedentes.models import AntecedentePersonal
+                    ant, _ = AntecedentePersonal.objects.get_or_create(paciente=paciente)
+                    for k, v in data['antecedentes'].items():
+                        if hasattr(ant, k):
+                            setattr(ant, k, v)
+                    ant.save()
+            else:
+                # Sin paciente: crear uno nuevo con los datos enviados (como en importar_csv)
+                from apps.personas.models import Persona, Domicilio
+                from apps.pacientes.models import Paciente
+                from apps.antecedentes.models import AntecedentePersonal
+                # Crear o reutilizar Persona por DNI (mismo criterio que importar_csv)
+                persona_data = {
+                    'nombre': data.get('nombre') or alumno.nombre or '',
+                    'apellido': data.get('apellido') or alumno.apellido or '',
+                    'dni': data.get('dni') or alumno.dni,
+                    'tipo_dni': data.get('tipo_dni') or alumno.tipo_dni or 'DNI',
+                    'sexo': data.get('sexo') or alumno.sexo or 'otro',
+                    'fecha_nacimiento': alumno.fecha_nacimiento or '2000-01-01',
+                }
+                if 'fecha_nacimiento' in data and data['fecha_nacimiento']:
+                    try:
+                        from datetime import datetime
+                        persona_data['fecha_nacimiento'] = datetime.strptime(data['fecha_nacimiento'], '%Y-%m-%d').date()
+                    except Exception:
+                        pass
+                persona = Persona.objects.filter(dni=persona_data['dni']).first()
+                if persona is None:
+                    persona = Persona.objects.create(**persona_data)
+                else:
+                    for f in ('nombre', 'apellido', 'tipo_dni', 'sexo'):
+                        if data.get(f):
+                            setattr(persona, f, data[f])
+                    if data.get('fecha_nacimiento'):
+                        try:
+                            from datetime import datetime
+                            persona.fecha_nacimiento = datetime.strptime(data['fecha_nacimiento'], '%Y-%m-%d').date()
+                        except Exception:
+                            pass
+                    persona.save()
+                domicilio = Domicilio.objects.create(localidad=data.get('localidad') or '')
+                # Calcular edad
+                edad = data.get('edad') or 0
+                if not edad and persona.fecha_nacimiento:
+                    try:
+                        from datetime import datetime as dt
+                        hoy = dt.now().date()
+                        edad = hoy.year - persona.fecha_nacimiento.year - ((hoy.month, hoy.day) < (persona.fecha_nacimiento.month, persona.fecha_nacimiento.day))
+                    except Exception:
+                        edad = 0
+                paciente = Paciente.objects.create(
+                    escuela=operativo.escuela,
+                    persona=persona,
+                    domicilio=domicilio,
+                    edad=edad,
+                    tiene_cud=data.get('tiene_cud'),
+                    tipo_cobertura=data.get('tipo_cobertura'),
+                    nombre_cobertura=data.get('nombre_cobertura'),
+                    telefono_fijo=data.get('telefono_fijo'),
+                    celular=data.get('celular'),
+                )
+                AntecedentePersonal.objects.get_or_create(paciente=paciente)
+                if 'antecedentes' in data and isinstance(data['antecedentes'], dict):
+                    ant, _ = AntecedentePersonal.objects.get_or_create(paciente=paciente)
+                    for k, v in data['antecedentes'].items():
+                        if hasattr(ant, k):
+                            setattr(ant, k, v)
+                    ant.save()
+                alumno.paciente = paciente
+                alumno.save(update_fields=['paciente'])
+
+            alumno.antecedentes_completado = True
+            alumno.save(update_fields=['antecedentes_completado'])
+            alumno.refresh_from_db()
+            _auto_evaluar_si_completo(alumno)
+        except (IntegrityError, DataError):
+            return Response(
+                {'error': 'No se pudieron guardar los datos. Verificá que no haya DNIs duplicados ni valores demasiado largos.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         return self.get(request, pk, alumno_pk)
 

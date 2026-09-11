@@ -7,15 +7,18 @@ con contraseñas de juguete, pensados solo para desarrollo local.
 
 ## Contraseña
 
-La contraseña actual de los fixtures es **`prosane-dev-2026`**.
+La contraseña de los fixtures es **`prosane123`** para todos los usuarios.
 
 ## Emails de prueba
 
-- `superadmin@prosane.test` (superusuario)
+- `superadmin@prosane.test` → rol **superadmin** (superusuario, acceso total)
 - `medico@prosane.test` → rol **medico**
+- `medico1@prosane.test` → rol **medico**
 - `odontologo@prosane.test` → rol **odontologo**
+- `odontologo1@prosane.test` → rol **odontologo**
 - `ayudante@prosane.test` → rol **ayudante**
 - `tutor@prosane.test` → rol **tutor**
+- `escuela@prosane.test` → rol **escuela**
 
 ## Cargar en local
 

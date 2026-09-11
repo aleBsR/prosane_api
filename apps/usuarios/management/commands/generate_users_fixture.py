@@ -20,7 +20,7 @@ from apps.usuarios.management.commands._fixture_uuids import role_uuid
 
 
 TEST_USERS = [
-    ("superadmin@prosane.test", "c0000000-0000-0000-0000-000000000001", True, None),
+    ("superadmin@prosane.test", "c0000000-0000-0000-0000-000000000001", True, "superadmin"),
     ("medico@prosane.test", "c0000000-0000-0000-0000-000000000002", False, "medico"),
     ("odontologo@prosane.test", "c0000000-0000-0000-0000-000000000003", False, "odontologo"),
     ("ayudante@prosane.test", "c0000000-0000-0000-0000-000000000004", False, "ayudante"),
