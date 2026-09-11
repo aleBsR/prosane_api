@@ -203,7 +203,7 @@ class EscuelaListSerializerTest(TestCase):
         s = EscuelaListSerializer(e)
         expected = {
             'id', 'nombre', 'cue', 'ambito', 'activa', 'localidad',
-            'usuarios_asociados', 'plurigrado_rural',
+            'usuarios_asociados', 'plurigrado_rural', 'perfil_completo',
         }
         self.assertEqual(set(s.data.keys()), expected)
 
@@ -872,4 +872,84 @@ class EscuelaAPIPermissionTest(APITestCase):
         escuela = Escuela.objects.create(nombre='Test')
         url = reverse('escuela-detail', args=[escuela.id])
         res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class EscuelaPerfilCompletitudTest(APITestCase):
+    """Alta mínima del admin + completado obligatorio por el usuario escuela."""
+
+    fixtures = ["roles", "users"]
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from django.core.management import call_command
+        call_command("seed_permissions", verbosity=0)
+
+    def _auth(self, email):
+        user = Usuario.objects.get(email=email)
+        self.client.force_authenticate(user=user)
+        return user
+
+    def _asignar_escuela(self, email, escuela):
+        user = Usuario.objects.get(email=email)
+        user.escuela = escuela
+        user.save(update_fields=["escuela"])
+
+    def test_alta_minima_solo_nombre_y_perfil_incompleto(self):
+        self._auth('ayudante@prosane.test')
+        url = reverse('escuela-list-create')
+        res = self.client.post(url, {'nombre': 'Nueva Mínima'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(res.data['perfil_completo'])
+        self.assertEqual(
+            set(res.data['campos_faltantes']),
+            {'CUE', 'Sector de gestión', 'Modalidad educativa', 'Teléfono', 'Localidad'},
+        )
+
+    def test_perfil_completo_con_todos_los_datos(self):
+        self._auth('ayudante@prosane.test')
+        url = reverse('escuela-list-create')
+        res = self.client.post(url, {
+            'nombre': 'Completa', 'cue': 'CUE1', 'sector_gestion': 'estatal',
+            'modalidad_educativa': 'comun', 'telefono': '123',
+            'domicilio': {'localidad': 'Salta'},
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(res.data['perfil_completo'])
+        self.assertEqual(res.data['campos_faltantes'], [])
+
+    def test_escuela_completa_sus_datos_via_mi_escuela(self):
+        escuela = Escuela.objects.create(nombre='Incompleta')
+        self._asignar_escuela('escuela@prosane.test', escuela)
+        self._auth('escuela@prosane.test')
+        url = reverse('mi-escuela')
+        res = self.client.patch(url, {
+            'cue': 'CUE9', 'sector_gestion': 'estatal',
+            'modalidad_educativa': 'comun', 'telefono': '456',
+            'domicilio': {'localidad': 'Orán'},
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data['perfil_completo'])
+        self.assertEqual(res.data['campos_faltantes'], [])
+
+    def test_escuela_ve_su_perfil_incompleto_en_mi_escuela(self):
+        escuela = Escuela.objects.create(nombre='Incompleta')
+        self._asignar_escuela('escuela@prosane.test', escuela)
+        self._auth('escuela@prosane.test')
+        res = self.client.get(reverse('mi-escuela'))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertFalse(res.data['perfil_completo'])
+        self.assertIn('CUE', res.data['campos_faltantes'])
+
+    def test_medico_no_puede_completar_mi_escuela(self):
+        self._auth('medico@prosane.test')
+        res = self.client.patch(reverse('mi-escuela'), {'telefono': '1'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_escuela_no_puede_editar_otra_escuela_por_detalle(self):
+        otra = Escuela.objects.create(nombre='Ajena')
+        self._auth('escuela@prosane.test')
+        url = reverse('escuela-detail', args=[otra.id])
+        res = self.client.patch(url, {'telefono': '1'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)

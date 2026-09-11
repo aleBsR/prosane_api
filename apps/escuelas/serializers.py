@@ -23,9 +23,36 @@ class UsuarioEscuelaSerializer(serializers.ModelSerializer):
         return list(obj.roles.values_list('rol', flat=True))
 
 
+# Datos que la escuela debe completar al ingresar (el alta del admin solo pide
+# nombre + CUE). Si falta alguno, `perfil_completo` es False y `campos_faltantes`
+# lista las etiquetas pendientes para mostrar en la app.
+CAMPOS_PERFIL_ESCUELA = [
+    ('cue', 'CUE'),
+    ('sector_gestion', 'Sector de gestión'),
+    ('modalidad_educativa', 'Modalidad educativa'),
+    ('telefono', 'Teléfono'),
+    ('localidad', 'Localidad'),
+]
+
+
+def perfil_completitud(escuela):
+    """Devuelve (perfil_completo: bool, campos_faltantes: [str])."""
+    faltantes = []
+    for campo, etiqueta in CAMPOS_PERFIL_ESCUELA:
+        if campo == 'localidad':
+            valor = escuela.domicilio.localidad if escuela.domicilio else ''
+        else:
+            valor = getattr(escuela, campo, '')
+        if not (valor or '').strip():
+            faltantes.append(etiqueta)
+    return (not faltantes, faltantes)
+
+
 class EscuelaSerializer(serializers.ModelSerializer):
     domicilio = DomicilioSerializer(required=False, allow_null=True)
     usuarios_asociados = serializers.SerializerMethodField()
+    perfil_completo = serializers.SerializerMethodField()
+    campos_faltantes = serializers.SerializerMethodField()
 
     class Meta:
         model = Escuela
@@ -33,8 +60,15 @@ class EscuelaSerializer(serializers.ModelSerializer):
             'id', 'nombre', 'cue', 'ambito', 'sector_gestion',
             'modalidad_educativa', 'intercultural_bilingue', 'plurigrado_rural',
             'domicilio', 'telefono', 'activa', 'usuarios_asociados',
+            'perfil_completo', 'campos_faltantes',
         ]
-    read_only_fields = ['id']
+    read_only_fields = ['id', 'perfil_completo', 'campos_faltantes']
+
+    def get_perfil_completo(self, obj):
+        return perfil_completitud(obj)[0]
+
+    def get_campos_faltantes(self, obj):
+        return perfil_completitud(obj)[1]
 
     def get_usuarios_asociados(self, obj):
         return UsuarioEscuelaSerializer(obj.usuarios_escuela.all(), many=True).data
@@ -61,11 +95,16 @@ class EscuelaSerializer(serializers.ModelSerializer):
 class EscuelaListSerializer(serializers.ModelSerializer):
     localidad = serializers.SerializerMethodField()
     usuarios_asociados = serializers.SerializerMethodField()
+    perfil_completo = serializers.SerializerMethodField()
 
     class Meta:
         model = Escuela
         fields = ['id', 'nombre', 'cue', 'ambito', 'activa', 'localidad', 'usuarios_asociados',
-                  'plurigrado_rural']
+                  'plurigrado_rural', 'perfil_completo']
+        read_only_fields = ['perfil_completo']
+
+    def get_perfil_completo(self, obj):
+        return perfil_completitud(obj)[0]
 
     def get_usuarios_asociados(self, obj):
         return UsuarioEscuelaSerializer(obj.usuarios_escuela.all(), many=True).data

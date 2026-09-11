@@ -57,7 +57,10 @@ class ProfesionalesApiTest(BaseAuthFixtureTest):
         self.assertEqual(res.data["matricula"], "99999999")
         usuario = Usuario.objects.get(email="nuevo@medico.test")
         self.assertTrue(usuario.roles.filter(rol="medico").exists())
-        self.assertTrue(usuario.check_password("clave123"))
+        # La contraseña es temporal generada, no la enviada (igual que escuela/ayudante)
+        self.assertTrue(usuario.must_change_password)
+        self.assertIsNotNone(usuario.temporal_password_expires_at)
+        self.assertFalse(usuario.check_password("clave123"))
         self.assertEqual(usuario.profesional_set.get().matricula, "99999999")
 
     def test_crear_odontologo_asigna_rol(self):
@@ -159,3 +162,30 @@ class ProfesionalesApiTest(BaseAuthFixtureTest):
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
         usuario.refresh_from_db()
         self.assertFalse(usuario.is_active)
+
+    def test_resend_temp_regenera_y_marca_must_change(self):
+        from django.urls import reverse
+        usuario = Usuario.objects.get(email="medico@prosane.test")
+        old_hash = usuario.password
+        url = reverse("profesional-resend-temp", kwargs={"pk": usuario.pk})
+        res = self.client.post(url, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        usuario.refresh_from_db()
+        self.assertTrue(usuario.must_change_password)
+        self.assertIsNotNone(usuario.temporal_password_expires_at)
+        self.assertNotEqual(usuario.password, old_hash)
+
+    def test_resend_temp_404_si_no_es_profesional(self):
+        from django.urls import reverse
+        usuario = Usuario.objects.get(email="escuela@prosane.test")
+        url = reverse("profesional-resend-temp", kwargs={"pk": usuario.pk})
+        res = self.client.post(url, format="json")
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_resend_temp_prohibido_sin_la_accion(self):
+        from django.urls import reverse
+        self.client.force_authenticate(Usuario.objects.get(email="tutor@prosane.test"))
+        usuario = Usuario.objects.get(email="medico@prosane.test")
+        url = reverse("profesional-resend-temp", kwargs={"pk": usuario.pk})
+        res = self.client.post(url, format="json")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)

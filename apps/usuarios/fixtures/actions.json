@@ -376,19 +376,36 @@
     {
         "model":  "usuarios.action",
         "fields":  {
-                       "name":  "verMiEscuela",
-                       "label":  "Ver mi escuela",
-                       "icon":  "school",
-                       "color":  "#1565C0",
-                       "type":  "crud",
-                       "category":  "escuelas",
-                       "is_sensitive":  false,
-                       "sort_order":  14,
-                       "is_active":  true,
-                       "created_at":  "2026-01-01T00:00:00Z",
-                       "updated_at":  "2026-01-01T00:00:00Z",
-                       "show_in_menu":  true
-                   }
+                        "name":  "verMiEscuela",
+                        "label":  "Ver mi escuela",
+                        "icon":  "school",
+                        "color":  "#1565C0",
+                        "type":  "crud",
+                        "category":  "escuelas",
+                        "is_sensitive":  false,
+                        "sort_order":  14,
+                        "is_active":  true,
+                        "created_at":  "2026-01-01T00:00:00Z",
+                        "updated_at":  "2026-01-01T00:00:00Z",
+                        "show_in_menu":  true
+                    }
+    },
+    {
+        "model":  "usuarios.action",
+        "fields":  {
+                        "name":  "completarDatosEscuela",
+                        "label":  "Completar datos de mi escuela",
+                        "icon":  "edit",
+                        "color":  "#1565C0",
+                        "type":  "crud",
+                        "category":  "escuelas",
+                        "is_sensitive":  false,
+                        "sort_order":  15,
+                        "is_active":  true,
+                        "created_at":  "2026-01-01T00:00:00Z",
+                        "updated_at":  "2026-01-01T00:00:00Z",
+                        "show_in_menu":  false
+                    }
     },
     {
         "model":  "usuarios.action",

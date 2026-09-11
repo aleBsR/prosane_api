@@ -17,6 +17,7 @@ from apps.tutores.models import Tutor
 from apps.usuarios.action_resolution import effective_actions
 from apps.usuarios.models import PasswordResetCode, Usuario
 from apps.usuarios.permissions import require_action
+from common.mails import TEMP_EXPIRY_HOURS, enviar_temporal, generar_temporal
 from apps.personas.models import Persona
 from apps.usuarios.serializers import (
     ChangePasswordSerializer,
@@ -219,38 +220,12 @@ class UsuarioEscuelaResendTempView(APIView):
         usuario = get_object_or_404(
             Usuario.objects.filter(roles__rol='escuela').distinct(), pk=pk,
         )
-        from django.contrib.auth.password_validation import validate_password
-        temp = None
-        for _ in range(5):
-            cand = secrets.token_urlsafe(10)
-            try:
-                validate_password(cand, usuario)
-                temp = cand
-                break
-            except Exception:
-                continue
-        if temp is None:
-            temp = secrets.token_urlsafe(12)
+        temp = generar_temporal(usuario)
         usuario.set_password(temp)
         usuario.must_change_password = True
-        usuario.temporal_password_expires_at = timezone.now() + timedelta(hours=72)
+        usuario.temporal_password_expires_at = timezone.now() + timedelta(hours=TEMP_EXPIRY_HOURS)
         usuario.save(update_fields=['password', 'must_change_password', 'temporal_password_expires_at'])
-        try:
-            send_mail(
-                subject='Acceso PROSANE — nueva contraseña temporal',
-                message=(
-                    f'Hola,\n\n'
-                    f'Te reenviaron un acceso en PROSANE ({usuario.email}).\n'
-                    f'Nueva contraseña temporal: {temp}\n'
-                    f'Vence en 72 horas. Al ingresar el sistema te pedirá cambiarla.\n\n'
-                    f'Ingresá en: https://prosane.salta.gob.ar/login\n'
-                ),
-                from_email=None,
-                recipient_list=[usuario.email],
-                fail_silently=True,
-            )
-        except Exception:
-            pass
+        enviar_temporal(usuario.email, temp, es_reenvio=True)
         return Response({'detail': 'Contraseña temporal reenviada.'})
 
 
@@ -314,38 +289,12 @@ class UsuarioAyudanteResendTempView(APIView):
         usuario = get_object_or_404(
             Usuario.objects.filter(roles__rol='ayudante').distinct(), pk=pk,
         )
-        from django.contrib.auth.password_validation import validate_password
-        temp = None
-        for _ in range(5):
-            cand = secrets.token_urlsafe(10)
-            try:
-                validate_password(cand, usuario)
-                temp = cand
-                break
-            except Exception:
-                continue
-        if temp is None:
-            temp = secrets.token_urlsafe(12)
+        temp = generar_temporal(usuario)
         usuario.set_password(temp)
         usuario.must_change_password = True
-        usuario.temporal_password_expires_at = timezone.now() + timedelta(hours=72)
+        usuario.temporal_password_expires_at = timezone.now() + timedelta(hours=TEMP_EXPIRY_HOURS)
         usuario.save(update_fields=['password', 'must_change_password', 'temporal_password_expires_at'])
-        try:
-            send_mail(
-                subject='Acceso PROSANE — nueva contraseña temporal',
-                message=(
-                    f'Hola,\n\n'
-                    f'Te reenviaron un acceso en PROSANE ({usuario.email}).\n'
-                    f'Nueva contraseña temporal: {temp}\n'
-                    f'Vence en 72 horas. Al ingresar el sistema te pedirá cambiarla.\n\n'
-                    f'Ingresá en: https://prosane.salta.gob.ar/login\n'
-                ),
-                from_email=None,
-                recipient_list=[usuario.email],
-                fail_silently=True,
-            )
-        except Exception:
-            pass
+        enviar_temporal(usuario.email, temp, es_reenvio=True)
         return Response({'detail': 'Contraseña temporal reenviada.'})
 
 

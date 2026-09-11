@@ -225,3 +225,7 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'False').lower() == 'true'
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@prosane.gob.ar')
+
+# URL de ingreso que figura en los mails de contraseña temporal.
+# En dev/test puede apuntar a la IP local; en producción al dominio real.
+LOGIN_URL = os.getenv('LOGIN_URL', 'https://prosane.salta.gob.ar/login')

@@ -1,3 +1,6 @@
+from datetime import timedelta
+
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,6 +13,7 @@ from apps.profesionales.serializers import (
 from apps.profesionales.services.services_refeps import RefepsError, RefepsService
 from apps.usuarios.models import Usuario
 from apps.usuarios.permissions import require_action
+from common.mails import TEMP_EXPIRY_HOURS, enviar_temporal, generar_temporal
 
 
 class ValidarMatriculaView(APIView):
@@ -113,3 +117,22 @@ class ProfesionalDetailView(APIView):
         usuario.is_active = False
         usuario.save(update_fields=["is_active"])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProfesionalResendTempView(APIView):
+    """POST /api/v1/profesionales/<uuid:pk>/resend-temp/ — reenvía temporal (72h)."""
+
+    permission_classes = [require_action("gestionarProfesionales")]
+
+    def post(self, request, pk):
+        usuario = get_object_or_404(
+            Usuario.objects.filter(roles__rol__in=ROLES_PROFESIONAL).distinct(),
+            pk=pk,
+        )
+        temp = generar_temporal(usuario)
+        usuario.set_password(temp)
+        usuario.must_change_password = True
+        usuario.temporal_password_expires_at = timezone.now() + timedelta(hours=TEMP_EXPIRY_HOURS)
+        usuario.save(update_fields=["password", "must_change_password", "temporal_password_expires_at"])
+        enviar_temporal(usuario.email, temp, es_reenvio=True)
+        return Response({"detail": "Contraseña temporal reenviada."})

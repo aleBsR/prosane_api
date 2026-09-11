@@ -19,4 +19,9 @@ urlpatterns = [
         views.ProfesionalDetailView.as_view(),
         name="profesional-detail",
     ),
+    path(
+        "profesionales/<uuid:pk>/resend-temp/",
+        views.ProfesionalResendTempView.as_view(),
+        name="profesional-resend-temp",
+    ),
 ]

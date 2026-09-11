@@ -1,50 +1,14 @@
-import secrets
 from datetime import timedelta
 
-from django.contrib.auth.password_validation import validate_password
-from django.core.mail import send_mail
 from rest_framework import serializers
 from django.utils import timezone
 
 from apps.usuarios.models import PasswordResetCode, Usuario, Rol, RoleUsuario
 from apps.escuelas.models import Escuela
+from common.mails import TEMP_EXPIRY_HOURS, enviar_temporal, generar_temporal
 
 ROL_ESCUELA = 'escuela'
 ROL_AYUDANTE = 'ayudante'
-
-
-def _generar_temporal():
-    """Genera contraseña temporal aleatoria que pasa los validators."""
-    # 12-14 chars urlsafe, si falla la validación reintenta
-    for _ in range(5):
-        temp = secrets.token_urlsafe(10)
-        try:
-            validate_password(temp)
-            return temp
-        except Exception:
-            continue
-    return secrets.token_urlsafe(12)
-
-
-def _enviar_temporal_por_mail(usuario, temp_password):
-    """Envía mail con la temporal. No loguea la clave, solo el destinatario."""
-    try:
-        send_mail(
-            subject='Acceso PROSANE — contraseña temporal',
-            message=(
-                f'Hola,\n\n'
-                f'Te crearon un acceso en PROSANE ({usuario.email}).\n'
-                f'Contraseña temporal: {temp_password}\n'
-                f'Vence en 72 horas. Al ingresar por primera vez el sistema te pedirá cambiarla.\n\n'
-                f'Ingresá en: https://prosane.salta.gob.ar/login\n\n'
-                f'Si no esperabas este mail, ignoralo.\n'
-            ),
-            from_email=None,
-            recipient_list=[usuario.email],
-            fail_silently=True,
-        )
-    except Exception:
-        pass
 
 
 class RolesSerializer(serializers.ModelSerializer):
@@ -92,7 +56,7 @@ class UsuarioEscuelaSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password', None)
-        temp = _generar_temporal()
+        temp = generar_temporal()
         rol = Rol.objects.filter(rol=ROL_ESCUELA).first()
         if rol is None:
             raise serializers.ValidationError(
@@ -101,11 +65,11 @@ class UsuarioEscuelaSerializer(serializers.ModelSerializer):
         usuario = Usuario.objects.create_user(
             password=temp,
             must_change_password=True,
-            temporal_password_expires_at=timezone.now() + timedelta(hours=72),
+            temporal_password_expires_at=timezone.now() + timedelta(hours=TEMP_EXPIRY_HOURS),
             **validated_data,
         )
         RoleUsuario.objects.create(id_user=usuario, id_rol=rol)
-        _enviar_temporal_por_mail(usuario, temp)
+        enviar_temporal(usuario.email, temp)
         return usuario
 
     def update(self, instance, validated_data):
@@ -142,7 +106,7 @@ class UsuarioAyudanteSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password', None)
-        temp = _generar_temporal()
+        temp = generar_temporal()
         rol = Rol.objects.filter(rol=ROL_AYUDANTE).first()
         if rol is None:
             raise serializers.ValidationError(
@@ -151,11 +115,11 @@ class UsuarioAyudanteSerializer(serializers.ModelSerializer):
         usuario = Usuario.objects.create_user(
             password=temp,
             must_change_password=True,
-            temporal_password_expires_at=timezone.now() + timedelta(hours=72),
+            temporal_password_expires_at=timezone.now() + timedelta(hours=TEMP_EXPIRY_HOURS),
             **validated_data,
         )
         RoleUsuario.objects.create(id_user=usuario, id_rol=rol)
-        _enviar_temporal_por_mail(usuario, temp)
+        enviar_temporal(usuario.email, temp)
         return usuario
 
     def update(self, instance, validated_data):

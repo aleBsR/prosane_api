@@ -46,7 +46,8 @@ ROLE_ACTIONS = {
         "darConsentimiento", "cargarAntecedentesFamiliares", "cargarAntecedentesNino",
     ],
     "escuela": [
-        "verMiEscuela", "gestionarCursos", "verAlumnosEscuela", "registrarAlumnoEscuela",
+        "verMiEscuela", "completarDatosEscuela",
+        "gestionarCursos", "verAlumnosEscuela", "registrarAlumnoEscuela",
         "verOperativo", "importarNominaOperativo",
         "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
         "cargarAntecedentesNino",

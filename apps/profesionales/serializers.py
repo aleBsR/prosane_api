@@ -1,8 +1,5 @@
-import secrets
 from datetime import timedelta
 
-from django.contrib.auth.password_validation import validate_password
-from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
@@ -10,38 +7,9 @@ from rest_framework import serializers
 from apps.profesionales.models import Profesional
 from apps.profesionales.services.services_refeps import RefepsError, RefepsService
 from apps.usuarios.models import Rol, RoleUsuario, Usuario
+from common.mails import TEMP_EXPIRY_HOURS, enviar_temporal, generar_temporal
 
 ROLES_PROFESIONAL = ("medico", "odontologo")
-
-
-def _generar_temporal():
-    for _ in range(5):
-        cand = secrets.token_urlsafe(10)
-        try:
-            validate_password(cand)
-            return cand
-        except Exception:
-            continue
-    return secrets.token_urlsafe(12)
-
-
-def _enviar_temporal(usuario, temp):
-    try:
-        send_mail(
-            subject='Acceso PROSANE — contraseña temporal',
-            message=(
-                f'Hola,\n\n'
-                f'Te crearon un acceso en PROSANE ({usuario.email}).\n'
-                f'Contraseña temporal: {temp}\n'
-                f'Vence en 72 horas. Al ingresar el sistema te pedirá cambiarla.\n\n'
-                f'Ingresá en: https://prosane.salta.gob.ar/login\n'
-            ),
-            from_email=None,
-            recipient_list=[usuario.email],
-            fail_silently=True,
-        )
-    except Exception:
-        pass
 
 
 class ProfesionalSerializer(serializers.ModelSerializer):
@@ -86,7 +54,7 @@ class ProfesionalCreateSerializer(serializers.Serializer):
     def create(self, validated_data):
         email = validated_data["email"]
         validated_data.pop("password", None)
-        temp = _generar_temporal()
+        temp = generar_temporal()
         rol_name = validated_data["rol"]
         matricula = validated_data["matricula"]
         nombre = validated_data.get("nombre") or ""
@@ -102,7 +70,7 @@ class ProfesionalCreateSerializer(serializers.Serializer):
                 email=email,
                 password=temp,
                 must_change_password=True,
-                temporal_password_expires_at=timezone.now() + timedelta(hours=72),
+                temporal_password_expires_at=timezone.now() + timedelta(hours=TEMP_EXPIRY_HOURS),
             )
             rol, _ = Rol.objects.get_or_create(rol=rol_name)
             RoleUsuario.objects.create(id_user=usuario, id_rol=rol)
@@ -112,7 +80,7 @@ class ProfesionalCreateSerializer(serializers.Serializer):
                 nombre=nombre or None,
                 apellido=apellido or None,
             )
-        _enviar_temporal(usuario, temp)
+        enviar_temporal(usuario.email, temp)
         return usuario
 
     def update(self, instance, validated_data):

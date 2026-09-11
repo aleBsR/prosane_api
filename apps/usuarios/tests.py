@@ -12,7 +12,7 @@ from apps.usuarios.permissions import require_action
 
 Usuario = get_user_model()
 
-TEST_PASSWORD = "prosane-dev-2026"
+TEST_PASSWORD = "prosane123"
 
 
 class PermissionTest(TestCase):
@@ -77,7 +77,7 @@ class SeedPermissionsTest(TestCase):
 
         call_command("seed_permissions", verbosity=0)
 
-        self.assertEqual(Action.objects.filter(is_active=True).count(), 30)
+        self.assertEqual(Action.objects.filter(is_active=True).count(), 31)
         self.assertTrue(Rol.objects.filter(rol="ayudante").exists())
         self.assertTrue(ActionRole.objects.filter(role__rol="ayudante").exists())
 

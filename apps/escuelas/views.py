@@ -91,13 +91,26 @@ class EscuelaDetailView(APIView):
 
 
 class MiEscuelaView(APIView):
-    permission_classes = [require_action('verMiEscuela')]
+    """GET con `verMiEscuela`; PATCH/PUT con `completarDatosEscuela`.
+
+    Permite que el usuario escuela complete los datos de su establecimiento
+    (el alta del admin solo pide nombre + CUE). Siempre opera sobre la escuela
+    asignada al usuario — nunca sobre otra.
+    """
+
+    def get_permissions(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return [require_action('completarDatosEscuela')()]
+        return [require_action('verMiEscuela')()]
+
+    def _mi_escuela(self, request):
+        escuela_id = getattr(request.user, 'escuela_id', None)
+        return Escuela.objects.filter(pk=escuela_id).first() if escuela_id else None
 
     def get(self, request):
         # Resolución resiliente: si la escuela fue eliminada por otra vía
         # (FK colgada), se responde 404 en vez de explotar con 500.
-        escuela_id = getattr(request.user, 'escuela_id', None)
-        escuela = Escuela.objects.filter(pk=escuela_id).first() if escuela_id else None
+        escuela = self._mi_escuela(request)
         if escuela is None:
             return Response(
                 {'detail': 'El usuario no tiene una escuela asignada.'},
@@ -110,6 +123,30 @@ class MiEscuelaView(APIView):
         )
         data['cursos'] = CursoSerializer(cursos, many=True).data
         return Response(data)
+
+    def patch(self, request):
+        escuela = self._mi_escuela(request)
+        if escuela is None:
+            return Response(
+                {'detail': 'El usuario no tiene una escuela asignada.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = EscuelaSerializer(escuela, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def put(self, request):
+        escuela = self._mi_escuela(request)
+        if escuela is None:
+            return Response(
+                {'detail': 'El usuario no tiene una escuela asignada.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = EscuelaSerializer(escuela, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class CursoListCreateView(APIView):
