@@ -1,5 +1,7 @@
 from datetime import timedelta
 
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -141,6 +143,17 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=6)
     new_password = serializers.CharField(min_length=6)
 
+    def validate_new_password(self, value):
+        # Mismos requisitos que ChangePassword (8 chars, no común, no numérica, etc.).
+        # Buscamos el usuario por email para el validador de similitud.
+        email = self.initial_data.get('email', '') if isinstance(self.initial_data, dict) else ''
+        user = Usuario.objects.filter(email__iexact=email).first() if email else None
+        try:
+            validate_password(value, user)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)
+        return value
+
     def validate(self, attrs):
         code_obj = (
             PasswordResetCode.objects.filter(
@@ -162,7 +175,11 @@ class ChangePasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(min_length=6)
 
     def validate_new_password(self, value):
-        validate_password(value, self.context.get('request') and self.context['request'].user)
+        user = self.context.get('request') and self.context['request'].user
+        try:
+            validate_password(value, user)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)
         return value
 
 

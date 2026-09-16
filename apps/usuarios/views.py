@@ -1,7 +1,6 @@
 import secrets
 from datetime import timedelta
 
-from django.core.mail import send_mail
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.views import APIView
@@ -17,7 +16,7 @@ from apps.tutores.models import Tutor
 from apps.usuarios.action_resolution import effective_actions
 from apps.usuarios.models import PasswordResetCode, Usuario
 from apps.usuarios.permissions import require_action
-from common.mails import TEMP_EXPIRY_HOURS, enviar_temporal, generar_temporal
+from common.mails import TEMP_EXPIRY_HOURS, enviar_codigo_reset, enviar_temporal, generar_temporal
 from apps.personas.models import Persona
 from apps.usuarios.serializers import (
     ChangePasswordSerializer,
@@ -148,26 +147,18 @@ class ChangePasswordView(APIView):
 
 
 def _enviar_codigo_reset(email):
-    """Invalida códigos previos, genera uno nuevo de 6 dígitos y lo manda por email."""
+    """Invalida códigos previos, genera uno nuevo de 6 dígitos y lo manda por email (branding PROSANE)."""
+    from common.mails import RESET_EXPIRY_MINUTES
+
     now = timezone.now()
     PasswordResetCode.objects.filter(email=email, used_at__isnull=True).update(used_at=now)
     code = f'{secrets.randbelow(1_000_000):06d}'
     PasswordResetCode.objects.create(
         email=email,
         code=code,
-        expires_at=now + timedelta(minutes=30),
+        expires_at=now + timedelta(minutes=RESET_EXPIRY_MINUTES),
     )
-    send_mail(
-        subject='Código para restablecer tu contraseña - PROSANE',
-        message=(
-            'Recibiste este correo porque pediste restablecer tu contraseña en PROSANE.\n\n'
-            f'Tu código es: {code}\n\n'
-            'Vence en 30 minutos. Si no lo pediste, ignorá este mensaje.'
-        ),
-        from_email=None,
-        recipient_list=[email],
-        fail_silently=False,
-    )
+    enviar_codigo_reset(email, code)
 
 
 class PasswordResetRequestView(APIView):

@@ -124,3 +124,74 @@ def enviar_temporal(email, temp, es_reenvio=False):
         )
     except Exception:
         pass
+
+
+RESET_EXPIRY_MINUTES = 30
+
+
+def _cuerpo_plano_reset(email, code):
+    return (
+        "PROSANE — Programa Nacional de Salud Escolar (Salta)\n\n"
+        "Hola,\n\n"
+        f"Pediste restablecer tu contraseña en PROSANE ({email}).\n"
+        f"Tu código es: {code}\n"
+        f"Vence en {RESET_EXPIRY_MINUTES} minutos. "
+        "Abrí la app, elegí «¿Olvidaste tu contraseña?» e ingresá el código "
+        "para elegir tu nueva clave (mínimo 8 caracteres, no solo números).\n\n"
+        f"Ingresá en: {_login_url()}\n\n"
+        "Si no lo pediste, ignorá este mensaje.\n"
+    )
+
+
+def _cuerpo_html_reset(email, code):
+    return f"""\
+<html>
+<body style="margin:0;padding:0;background-color:#F1F0F5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F1F0F5;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
+<tr><td style="background-color:{_BRAND};background:linear-gradient(135deg,{_GRAD_START},{_GRAD_END});padding:28px 32px;text-align:center;">
+<div style="font-size:26px;font-weight:bold;color:#ffffff;letter-spacing:2px;">PROSANE</div>
+<div style="font-size:13px;color:#EDE9FE;margin-top:6px;">Programa Nacional de Salud Escolar &bull; Salta</div>
+</td></tr>
+<tr><td style="padding:28px 32px;color:{_TEXT};">
+<p style="font-size:16px;margin:0 0 8px;">Hola,</p>
+<p style="font-size:14px;margin:0 0 16px;">Pediste restablecer tu contrase&ntilde;a en PROSANE (<b>{email}</b>). Us&aacute; este c&oacute;digo para elegir tu nueva clave:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 16px;">
+<tr><td align="center" style="background-color:#F1F0F5;border:1px dashed {_BRAND};border-radius:12px;padding:16px;">
+<div style="font-size:12px;color:{_MUTED};text-transform:uppercase;letter-spacing:1px;">C&oacute;digo de verificaci&oacute;n</div>
+<div style="font-size:32px;font-weight:bold;color:{_BRAND_DARK};letter-spacing:6px;margin-top:6px;">{code}</div>
+<div style="font-size:12px;color:{_MUTED};margin-top:6px;">Vence en {RESET_EXPIRY_MINUTES} minutos</div>
+</td></tr>
+</table>
+<p style="font-size:14px;font-weight:bold;margin:0 0 8px;">C&oacute;mo restablecerla:</p>
+<ol style="font-size:14px;margin:0 0 16px;padding-left:20px;">
+<li>Abr&iacute; la app PROSANE y toc&aacute; <b>&iquest;Olvidaste tu contrase&ntilde;a?</b></li>
+<li>Ingres&aacute; el c&oacute;digo de 6 d&iacute;gitos.</li>
+<li>Eleg&iacute; tu nueva contrase&ntilde;a (m&iacute;nimo 8 caracteres, no solo n&uacute;meros, evit&aacute; claves comunes).</li>
+</ol>
+<p style="font-size:13px;color:{_MUTED};margin:0;">Si no pediste este c&oacute;digo, ignor&aacute; este mensaje. Ante cualquier duda consult&aacute; con tu referente PROSANE.</p>
+</td></tr>
+<tr><td style="background-color:#F1F0F5;padding:16px 32px;text-align:center;font-size:12px;color:{_MUTED};">
+PROSANE &bull; Salud Escolar &bull; Provincia de Salta
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
+
+def enviar_codigo_reset(email, code):
+    """Envía el código de reseteo con el mismo branding que la temporal (texto + HTML)."""
+    try:
+        send_mail(
+            subject="PROSANE — código para restablecer tu contraseña",
+            message=_cuerpo_plano_reset(email, code),
+            from_email=None,
+            recipient_list=[email],
+            fail_silently=True,
+            html_message=_cuerpo_html_reset(email, code),
+        )
+    except Exception:
+        pass
