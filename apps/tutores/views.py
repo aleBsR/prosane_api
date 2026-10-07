@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from apps.usuarios.permissions import require_action
+from apps.auditoria.helpers import auditar_cambio
+from apps.auditoria.models import AuditoriaCambio
 from apps.antecedentes.models import AntecedentePersonal
 from apps.antecedentes.serializers import AntecedentespersonalesSerializer
 from apps.pacientes.models import Paciente
@@ -48,6 +50,14 @@ class RegisterTutorView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        from apps.tutores.models import Tutor as _Tutor
+        tutor = _Tutor.objects.filter(
+            usuario_id=result["user"]["id"],
+        ).first()
+        auditar_cambio(request, 'tutor', AuditoriaCambio.CREAR,
+                       entidad_id=tutor.id if tutor else None,
+                       detalle={'email': result["user"]["email"],
+                                'origen': 'registro-publico'})
         return Response(result, status=status.HTTP_201_CREATED)
 
 
@@ -101,6 +111,13 @@ class TutorHijosView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        persona = getattr(hijo, 'persona', None)
+        auditar_cambio(request, 'paciente', AuditoriaCambio.CREAR,
+                       entidad_id=hijo.id,
+                       detalle={'dni': persona.dni if persona else '',
+                                'apellido': persona.apellido if persona else '',
+                                'nombre': persona.nombre if persona else '',
+                                'origen': 'tutor-hijo'})
         output = HijoOutputSerializer(hijo)
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -119,6 +136,9 @@ class TutorConsentimientoView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        auditar_cambio(request, 'tutor', AuditoriaCambio.EDITAR,
+                       entidad_id=tutor.id,
+                       detalle={'consentimiento': 'aceptado'})
         serializer = TutorConsentimientoOutputSerializer(tutor)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -154,6 +174,10 @@ class TutorAntecedentesFamiliaresView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        auditar_cambio(request, 'antecedente', AuditoriaCambio.EDITAR,
+                       entidad_id=antecedente.id,
+                       detalle={'tipo': 'familiar-tutor',
+                                'campos': sorted(serializer.validated_data.keys())})
         output = AntecedenteFamiliarTutorSerializer(antecedente)
         return Response(output.data, status=status.HTTP_200_OK)
 
@@ -206,6 +230,11 @@ class TutorAntecedentesNinoView(APIView):
         try:
             antecedente = upsert_antecedentes_nino(pk, paciente_id, request.user, request.data)
             serializer = AntecedentespersonalesSerializer(antecedente)
+            auditar_cambio(request, 'antecedente', AuditoriaCambio.EDITAR,
+                           entidad_id=antecedente.id,
+                           detalle={'tipo': 'personal-nino',
+                                    'paciente_id': str(antecedente.paciente_id),
+                                    'campos': sorted(request.data.keys()) if isinstance(request.data, dict) else []})
             return Response(serializer.data, status=status.HTTP_200_OK)
         except AntecedenteNinoError as exc:
             status_code = status.HTTP_403_FORBIDDEN if "permiso" in exc.message.lower() else status.HTTP_404_NOT_FOUND

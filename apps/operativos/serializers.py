@@ -130,6 +130,8 @@ class EvaluacionMedicaSerializer(serializers.ModelSerializer):
             'examen_realizado', 'motivo_no_examen', 'lugar_examen',
             'trajo_carnet', 'carnet_completo', 'vacunas_aplicadas', 'vacunas_indicadas',
             'peso', 'talla', 'imc', 'percentil_talla', 'percentil_imc',
+            'antropometria_evaluada',
+            'presion_evaluada',
             'pas', 'pad', 'presion_clasificacion',
             'agudeza_evaluada', 'ojo_derecho', 'ojo_izquierdo', 'usa_lentes',
             'audiometria_realizada', 'audiometria_resultado',
@@ -137,6 +139,64 @@ class EvaluacionMedicaSerializer(serializers.ModelSerializer):
             'completada',
         ]
         read_only_fields = ['id', 'operativo_alumno', 'profesional', 'fecha_evaluacion']
+
+    def validate(self, attrs):
+        """Coacciona dependientes huérfanos (red de seguridad).
+
+        Los frontends ya limpian al alternar, pero cualquier cliente puede
+        mandar combinaciones contradictorias (ej. estado 'sin' + checks).
+        Se fusiona con los valores actuales para que también funcione en
+        PATCH parciales.
+        """
+        attrs = super().validate(attrs)
+        actual = {}
+        if self.instance is not None:
+            for campo in (
+                'examen_realizado', 'trajo_carnet', 'carnet_completo',
+                'antropometria_evaluada', 'presion_evaluada',
+                'agudeza_evaluada', 'audiometria_realizada',
+            ):
+                actual[campo] = getattr(self.instance, campo, None)
+        datos = {**actual, **attrs}
+        # Solo se coacciona un grupo si su disparador viene en el request
+        # o hay instancia (en creates sin el campo rige el default del modelo).
+        decide = lambda k: k in attrs or self.instance is not None  # noqa: E731
+
+        if decide('examen_realizado'):
+            if datos.get('examen_realizado'):
+                attrs['motivo_no_examen'] = ''
+            else:
+                attrs['lugar_examen'] = ''
+        if decide('trajo_carnet') or decide('carnet_completo'):
+            if not datos.get('trajo_carnet'):
+                attrs['carnet_completo'] = False
+                attrs['vacunas_aplicadas'] = ''
+                attrs['vacunas_indicadas'] = ''
+            elif datos.get('carnet_completo'):
+                attrs['vacunas_aplicadas'] = ''
+                attrs['vacunas_indicadas'] = ''
+        if decide('antropometria_evaluada') and not datos.get('antropometria_evaluada'):
+            attrs.update(peso=None, talla=None, imc=None,
+                         percentil_talla='', percentil_imc='')
+        if decide('presion_evaluada') and not datos.get('presion_evaluada'):
+            attrs.update(pas=None, pad=None, presion_clasificacion='')
+        if decide('agudeza_evaluada') and not datos.get('agudeza_evaluada'):
+            attrs.update(ojo_derecho='', ojo_izquierdo='', usa_lentes=False)
+        if decide('audiometria_realizada') and not datos.get('audiometria_realizada'):
+            attrs['audiometria_resultado'] = ''
+
+        hallazgos = attrs.get('hallazgos')
+        if isinstance(hallazgos, dict):
+            for sistema, item in hallazgos.items():
+                if isinstance(item, dict) and item.get('estado') != 'con':
+                    item['checks'] = []
+                    item['detalle'] = ''
+        derivaciones = attrs.get('derivaciones')
+        if isinstance(derivaciones, dict):
+            for esp, item in derivaciones.items():
+                if isinstance(item, dict) and not item.get('deriva'):
+                    item['motivo'] = ''
+        return attrs
 
 
 class EvaluacionOdontologicaSerializer(serializers.ModelSerializer):
@@ -202,6 +262,29 @@ class EvaluacionOdontologicaSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'operativo_alumno', 'profesional', 'fecha_evaluacion']
 
+    def validate(self, attrs):
+        """Coacciona salud bucal != con_hallazgos (red de seguridad).
+
+        Los frontends ya limpian al alternar; esto evita persistir
+        combinaciones contradictorias desde cualquier cliente.
+        """
+        attrs = super().validate(attrs)
+        decide = 'salud_bucal' in attrs or self.instance is not None
+        if decide:
+            salud = attrs.get(
+                'salud_bucal',
+                getattr(self.instance, 'salud_bucal', ''),
+            )
+            if salud != 'con_hallazgos':
+                attrs.update(
+                    lesiones_tejidos_blandos=False,
+                    maloclusion=False,
+                    fluorosis=False,
+                    caries=False,
+                    otros='',
+                )
+        return attrs
+
 
 class SeccionEscuelaSerializer(serializers.ModelSerializer):
     class Meta:
@@ -211,3 +294,15 @@ class SeccionEscuelaSerializer(serializers.ModelSerializer):
             'escuela_dificultad_lenguaje', 'escuela_bajo_tratamiento',
             'escuela_completado',
         ]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        decide = 'escuela_preocupa_salud' in attrs or self.instance is not None
+        if decide:
+            preocupa = attrs.get(
+                'escuela_preocupa_salud',
+                getattr(self.instance, 'escuela_preocupa_salud', False),
+            )
+            if not preocupa:
+                attrs['escuela_preocupa_detalle'] = ''
+        return attrs

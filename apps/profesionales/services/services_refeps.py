@@ -43,7 +43,21 @@ class RefepsService:
 
     @classmethod
     def _consultar_real(cls, matricula: str) -> dict | None:
-        raise NotImplementedError("API REFEPS real no implementada")
+        from apps.integraciones.bus_msal import (
+            BusError,
+            BusNoConfigurado,
+            BusNoEncontrado,
+            refeps_por_matricula,
+        )
+
+        try:
+            return refeps_por_matricula(matricula)
+        except BusNoEncontrado:
+            return None
+        except BusNoConfigurado as e:
+            raise RefepsError(str(e))
+        except BusError as e:
+            raise RefepsError(str(e))
 
 
 class RefepsError(Exception):

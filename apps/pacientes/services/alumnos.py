@@ -5,6 +5,7 @@ from apps.escuelas.models import Curso, Escuela
 from apps.operativos.models import Operativo, OperativoAlumno
 from apps.pacientes.models import Paciente
 from apps.personas.models import Domicilio, Persona
+from apps.tutores.models import Tutor
 
 
 class AlumnoEscuelaError(Exception):
@@ -12,6 +13,57 @@ class AlumnoEscuelaError(Exception):
         super().__init__(message)
         self.message = message
         self.field = field
+
+
+def vincular_tutor(paciente, tutor_data):
+    """Crea (o reutiliza por DNI) Persona+Tutor y lo vincula al paciente.
+
+    Permite a la escuela cargar los datos del adulto responsable en la
+    primera etapa, sin cuenta de usuario. Si la persona ya existe se
+    reutiliza (y se completan nombre/apellido vacíos).
+    """
+    data = dict(tutor_data or {})
+    persona_data = dict(data.get('persona') or {})
+    dni = str(persona_data.get('dni') or '').strip()
+    if not dni:
+        raise AlumnoEscuelaError('El DNI del tutor es obligatorio.', field='tutor.persona.dni')
+    if paciente.persona_id and dni == (paciente.persona.dni or '').strip():
+        raise AlumnoEscuelaError(
+            'El DNI del tutor no puede ser el del propio alumno.',
+            field='tutor.persona.dni',
+        )
+    parentesco = str(data.get('parentesco') or '').strip()
+    if not parentesco:
+        raise AlumnoEscuelaError('El parentesco es obligatorio.', field='tutor.parentesco')
+    persona, creada = Persona.objects.get_or_create(
+        dni=dni,
+        defaults={
+            'nombre': persona_data.get('nombre') or '',
+            'apellido': persona_data.get('apellido') or '',
+            'tipo_dni': persona_data.get('tipo_dni') or 'DNI',
+            'sexo': persona_data.get('sexo') or '',
+            'fecha_nacimiento': persona_data.get('fecha_nacimiento'),
+        },
+    )
+    if not creada:
+        # Completar vacíos sin pisar datos existentes.
+        cambio = False
+        for campo in ('nombre', 'apellido', 'tipo_dni', 'sexo', 'fecha_nacimiento'):
+            nuevo = persona_data.get(campo)
+            if nuevo and not getattr(persona, campo, None):
+                setattr(persona, campo, nuevo)
+                cambio = True
+        if cambio:
+            persona.save()
+    tutor, _ = Tutor.objects.get_or_create(
+        persona=persona, defaults={'parentesco': parentesco},
+    )
+    if tutor.parentesco != parentesco:
+        tutor.parentesco = parentesco
+        tutor.save(update_fields=['parentesco', 'updated_at'])
+    paciente.tutor = tutor
+    paciente.save(update_fields=['tutor', 'updated_at'])
+    return tutor
 
 
 def crear_alumno_escuela(escuela_id, data):
@@ -72,6 +124,8 @@ def crear_alumno_escuela(escuela_id, data):
                 if hasattr(ant, k):
                     setattr(ant, k, v)
             ant.save()
+        if data.get('tutor'):
+            vincular_tutor(paciente, data['tutor'])
         if operativo is not None:
             OperativoAlumno.objects.create(
                 operativo=operativo,
@@ -99,5 +153,5 @@ def actualizar_antecedentes_paciente(paciente, data):
 
 def listar_alumnos_escuela(escuela_id):
     return Paciente.objects.filter(escuela_id=escuela_id).select_related(
-        'persona', 'domicilio', 'escuela',
+        'persona', 'domicilio', 'escuela', 'tutor__persona',
     ).order_by('persona__apellido', 'persona__nombre')

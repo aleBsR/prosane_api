@@ -6,7 +6,7 @@ class OperativoProfesional(BaseModel):
     ROL_CHOICES = [
         ('medico', 'Médico'),
         ('odontologo', 'Odontólogo'),
-        ('ayudante', 'Ayudante'),
+        ('administrativo', 'Administrativo'),
     ]
 
     operativo = models.ForeignKey(

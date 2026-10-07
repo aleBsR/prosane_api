@@ -5,8 +5,22 @@ from django.shortcuts import get_object_or_404
 from django.db import models
 
 from apps.usuarios.permissions import require_action, require_any_action
+from apps.auditoria.helpers import auditar_cambio
+from apps.auditoria.models import AuditoriaCambio
 from .models import Escuela, Curso
 from .serializers import EscuelaSerializer, EscuelaListSerializer, CursoSerializer
+
+
+def _detalle_escuela(escuela):
+    return {'nombre': escuela.nombre, 'cue': escuela.cue}
+
+
+def _detalle_curso(curso):
+    return {
+        'curso': f"{curso.sala_grado_anio or ''} {curso.division or ''}".strip(),
+        'ciclo_lectivo': curso.ciclo_lectivo,
+        'escuela': curso.escuela.nombre if curso.escuela_id else None,
+    }
 
 
 class EscuelaListCreateView(APIView):
@@ -32,7 +46,9 @@ class EscuelaListCreateView(APIView):
     def post(self, request):
         serializer = EscuelaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        escuela = serializer.save()
+        auditar_cambio(request, 'escuela', AuditoriaCambio.CREAR,
+                       entidad_id=escuela.id, detalle=_detalle_escuela(escuela))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -53,7 +69,16 @@ class EscuelaDetailView(APIView):
         )
 
     def get(self, request, pk):
-        escuela = self.get_object(pk)
+        # Solo activas: una escuela desactivada no debe poder verse por
+        # detalle (URL directa, "atrás" del navegador o caché). Evita que
+        # reaparezca tras el borrado.
+        escuela = get_object_or_404(
+            Escuela.objects.select_related('domicilio').prefetch_related(
+                'usuarios_escuela__persona', 'usuarios_escuela__roles',
+            ),
+            pk=pk,
+            activa=True,
+        )
         serializer = EscuelaSerializer(escuela)
         return Response(serializer.data)
 
@@ -62,6 +87,10 @@ class EscuelaDetailView(APIView):
         serializer = EscuelaSerializer(escuela, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        auditar_cambio(request, 'escuela', AuditoriaCambio.EDITAR,
+                       entidad_id=escuela.id,
+                       detalle={**_detalle_escuela(escuela),
+                                'campos': sorted(request.data.keys())})
         return Response(serializer.data)
 
     def patch(self, request, pk):
@@ -69,6 +98,10 @@ class EscuelaDetailView(APIView):
         serializer = EscuelaSerializer(escuela, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        auditar_cambio(request, 'escuela', AuditoriaCambio.EDITAR,
+                       entidad_id=escuela.id,
+                       detalle={**_detalle_escuela(escuela),
+                                'campos': sorted(request.data.keys())})
         return Response(serializer.data)
 
     def delete(self, request, pk):
@@ -87,6 +120,8 @@ class EscuelaDetailView(APIView):
             )
         escuela.activa = False
         escuela.save()
+        auditar_cambio(request, 'escuela', AuditoriaCambio.DESACTIVAR,
+                       entidad_id=escuela.id, detalle=_detalle_escuela(escuela))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -134,6 +169,11 @@ class MiEscuelaView(APIView):
         serializer = EscuelaSerializer(escuela, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        auditar_cambio(request, 'escuela', AuditoriaCambio.EDITAR,
+                       entidad_id=escuela.id,
+                       detalle={**_detalle_escuela(escuela),
+                                'campos': sorted(request.data.keys()),
+                                'origen': 'mi-escuela'})
         return Response(serializer.data)
 
     def put(self, request):
@@ -146,6 +186,11 @@ class MiEscuelaView(APIView):
         serializer = EscuelaSerializer(escuela, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        auditar_cambio(request, 'escuela', AuditoriaCambio.EDITAR,
+                       entidad_id=escuela.id,
+                       detalle={**_detalle_escuela(escuela),
+                                'campos': sorted(request.data.keys()),
+                                'origen': 'mi-escuela'})
         return Response(serializer.data)
 
 
@@ -175,7 +220,9 @@ class CursoListCreateView(APIView):
             return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
         serializer = CursoSerializer(data=request.data, context={'escuela': escuela})
         serializer.is_valid(raise_exception=True)
-        serializer.save(escuela=escuela)
+        curso = serializer.save(escuela=escuela)
+        auditar_cambio(request, 'curso', AuditoriaCambio.CREAR,
+                       entidad_id=curso.id, detalle=_detalle_curso(curso))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -205,6 +252,10 @@ class CursoDetailView(APIView):
         serializer = CursoSerializer(curso, data=request.data, context={'escuela': curso.escuela})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        auditar_cambio(request, 'curso', AuditoriaCambio.EDITAR,
+                       entidad_id=curso.id,
+                       detalle={**_detalle_curso(curso),
+                                'campos': sorted(request.data.keys())})
         return Response(serializer.data)
 
     def patch(self, request, escuela_pk, pk):
@@ -214,11 +265,18 @@ class CursoDetailView(APIView):
         serializer = CursoSerializer(curso, data=request.data, partial=True, context={'escuela': curso.escuela})
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        auditar_cambio(request, 'curso', AuditoriaCambio.EDITAR,
+                       entidad_id=curso.id,
+                       detalle={**_detalle_curso(curso),
+                                'campos': sorted(request.data.keys())})
         return Response(serializer.data)
 
     def delete(self, request, escuela_pk, pk):
         curso = self._curso(request, escuela_pk, pk)
         if curso is None:
             return Response({'detail': 'No tenés acceso a esta escuela.'}, status=status.HTTP_404_NOT_FOUND)
+        detalle = _detalle_curso(curso)
         curso.delete()
+        auditar_cambio(request, 'curso', AuditoriaCambio.ELIMINAR,
+                       entidad_id=curso.id, detalle=detalle)
         return Response(status=status.HTTP_204_NO_CONTENT)

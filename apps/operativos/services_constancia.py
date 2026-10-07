@@ -17,11 +17,70 @@ COLOR_PRIMARIO = HexColor('#6C5CE7')
 COLOR_VERDE = HexColor('#00B894')
 COLOR_GRIS = HexColor('#636E72')
 
+# Etiquetas de sistemas y checks de hallazgos (espejo del formulario).
+SISTEMA_LABELS = {
+    'piel': 'Piel y faneras',
+    'partes_blandas': 'Partes blandas',
+    'cardiovascular': 'Cardiovascular',
+    'respiratorio': 'Respiratorio',
+    'abdominal': 'Abdominal',
+    'genitourinario_ninos': 'Genitourinario (Niños)',
+    'genitourinario_ninas': 'Genitourinario (Niñas)',
+    'osteoarticular': 'Osteoarticular',
+    'neurologico': 'Neurológico',
+    'salud_visual': 'Salud visual',
+    'salud_fonoaudiologica': 'Salud fonoaudiológica',
+    'icv': 'ICV',
+    'genitourinario': 'Genitourinario',
+    'fonoaudiologica': 'Fonoaudiológica',
+}
+ESTADO_LABELS = {'con': 'Con hallazgos', 'sin': 'Sin hallazgos', 'no_eval': 'No evaluado'}
+CHECK_LABELS = {
+    'nevo_derivacion': 'Nevos con criterio de derivación',
+    'escabiosis': 'Escabiosis',
+    'piodermitis': 'Piodermitis',
+    'pediculosis': 'Pediculosis',
+    'adenomegalia_localizada': 'Adenomegalia localizada',
+    'adenomegalias_generalizada': 'Adenomegalias generalizadas',
+    'presion_elevada': 'Presión arterial elevada',
+    'pulso_alterado': 'Alteración del pulso',
+    'soplo': 'Soplo',
+    'arritmia': 'Arritmia',
+    'hallazgo_auscultatorio': 'Hallazgo auscultatorio',
+    'respiracion_bucal': 'Respiración bucal',
+    'hepatomegalia': 'Hepatomegalia',
+    'masa_palpable': 'Masa palpable',
+    'esplenomegalia': 'Esplenomegalia',
+    'hernias': 'Hernias',
+    'hernia': 'Hernia',
+    'pubertad_precoz': 'Signos de pubertad precoz',
+    'testiculo_no_descendido': 'Testículo/s no descendido/s',
+    'fimosis': 'Fimosis',
+    'asimetria_testicular': 'Asimetría testicular',
+    'varicocele': 'Varicocele',
+    'adams_positiva': 'Maniobra de Adams positiva',
+    'alteracion_marcha': 'Alteraciones de la marcha',
+    'paresias_focales': 'Paresias o signos focales',
+    'movimientos_anormales': 'Movimientos anormales',
+    'disminucion_agudeza': 'Disminución de agudeza visual',
+    'estrabismo': 'Estrabismo',
+    'posicion_cabeza': 'Posición anormal de la cabeza',
+    'ojo_externo': 'Alteraciones del ojo externo',
+    'audiometria_no_pasa': "'No pasa' Audiometría/barrido tonal",
+    'alteracion_lenguaje': 'Alteraciones en el lenguaje/habla/comunicación',
+    'otro': 'Otro',
+}
+
 
 def _safe(v, default='—'):
     if v is None or v == '':
         return default
     return str(v)
+
+
+def _sino(v):
+    """Sí/No para los checks CPO/ceo (booleanos desde la migración 0006)."""
+    return 'Sí' if v else 'No'
 
 
 def generar_constancia_pdf(operativo: Operativo, alumno: OperativoAlumno) -> bytes:
@@ -157,12 +216,19 @@ def generar_constancia_pdf(operativo: Operativo, alumno: OperativoAlumno) -> byt
             for sistema, val in med.hallazgos.items():
                 if isinstance(val, dict):
                     estado = _safe(val.get('estado'))
+                    if not estado or estado == '—':
+                        continue
+                    etiqueta = SISTEMA_LABELS.get(str(sistema), str(sistema))
+                    estado_txt = ESTADO_LABELS.get(str(val.get('estado')), estado)
+                    partes = [estado_txt]
+                    checks = val.get('checks')
+                    if isinstance(checks, list):
+                        for c in checks:
+                            partes.append(CHECK_LABELS.get(str(c), str(c)))
                     detalle = _safe(val.get('detalle'), '')
-                    if estado and estado != '—':
-                        txt = f"<b>{sistema}:</b> {estado}"
-                        if detalle and detalle != '—':
-                            txt += f" — {detalle}"
-                        story.append(Paragraph(txt, s_normal))
+                    if detalle and detalle != '—':
+                        partes.append(detalle)
+                    story.append(Paragraph(f"<b>{etiqueta}:</b> {' — '.join(partes)}", s_normal))
         if med.derivaciones:
             deriv_list = [k for k, v in med.derivaciones.items() if isinstance(v, dict) and v.get('deriva')]
             if deriv_list:
@@ -210,7 +276,7 @@ def generar_constancia_pdf(operativo: Operativo, alumno: OperativoAlumno) -> byt
         if odonto.otros:
             story.append(Paragraph(f"<b>Otros:</b> {_safe(odonto.otros)}", s_normal))
         story.append(Spacer(1, 3))
-        story.append(Paragraph(f"CPO: C:{_safe(odonto.cpo_c, '—')}  P:{_safe(odonto.cpo_p, '—')}  O:{_safe(odonto.cpo_o, '—')} &nbsp;&nbsp;|&nbsp;&nbsp; ceo: c:{_safe(odonto.ceo_c, '—')}  e:{_safe(odonto.ceo_e, '—')}  o:{_safe(odonto.ceo_o, '—')}", s_normal))
+        story.append(Paragraph(f"CPO: C:{_sino(odonto.cpo_c)}  P:{_sino(odonto.cpo_p)}  O:{_sino(odonto.cpo_o)} &nbsp;&nbsp;|&nbsp;&nbsp; ceo: c:{_sino(odonto.ceo_c)}  e:{_sino(odonto.ceo_e)}  o:{_sino(odonto.ceo_o)}", s_normal))
         pract = []
         if odonto.topicacion_fluor:
             pract.append('topicación flúor')
@@ -232,6 +298,16 @@ def generar_constancia_pdf(operativo: Operativo, alumno: OperativoAlumno) -> byt
     ahora = timezone.now().strftime('%d/%m/%Y %H:%M')
     story.append(Paragraph(f"Constancia generada el {ahora} — Operativo {operativo.id} — Alumno {alumno.id} — PROSANE Salta", s_small))
     story.append(Paragraph("Documento informativo — no reemplaza la historia clínica. Validación con DNI y fecha de operativo.", s_small))
+    story.append(Spacer(1, 6))
+    story.append(HRFlowable(width='100%', thickness=0.6, color=HexColor('#DFE6E9'), spaceAfter=6))
+    story.append(Paragraph(
+        "Protección de datos: la información aquí contenida constituye dato personal sensible de salud, "
+        "amparado por la Ley N° 25.326 de Protección de los Datos Personales y por la Ley N° 26.529 de "
+        "Derechos del Paciente, Historia Clínica y Consentimiento Informado (y sus modificatorias). Su "
+        "tratamiento, comunicación y conservación deben ajustarse a dichas normas; el acceso y la impresión "
+        "de este documento quedan registrados y auditados.",
+        s_small,
+    ))
 
     doc.build(story)
     pdf = buffer.getvalue()

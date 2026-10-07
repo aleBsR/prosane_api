@@ -512,18 +512,35 @@
     {
         "model":  "usuarios.action",
         "fields":  {
-                       "name":  "gestionarAyudantes",
-                       "label":  "Gestionar usuarios ayudantes",
-                       "icon":  "manage_accounts",
-                       "color":  "#6A1B9A",
-                       "type":  "crud",
-                       "category":  "usuarios",
-                       "is_sensitive":  true,
-                       "sort_order":  82,
-                       "is_active":  true,
-                       "created_at":  "2026-01-01T00:00:00Z",
-                       "updated_at":  "2026-01-01T00:00:00Z",
-                       "show_in_menu":  true
-                   }
+                        "name":  "gestionarAdministrativos",
+                         "label":  "Gestionar usuarios administrativos",
+                        "icon":  "manage_accounts",
+                        "color":  "#6A1B9A",
+                        "type":  "crud",
+                        "category":  "usuarios",
+                        "is_sensitive":  true,
+                        "sort_order":  82,
+                        "is_active":  true,
+                        "created_at":  "2026-01-01T00:00:00Z",
+                        "updated_at":  "2026-01-01T00:00:00Z",
+                        "show_in_menu":  true
+                    }
+    },
+    {
+        "model":  "usuarios.action",
+        "fields":  {
+                        "name":  "verAuditoria",
+                         "label":  "Auditoría de cambios",
+                        "icon":  "history",
+                        "color":  "#6A1B9A",
+                        "type":  "crud",
+                        "category":  "auditoria",
+                        "is_sensitive":  true,
+                        "sort_order":  83,
+                        "is_active":  true,
+                        "created_at":  "2026-01-01T00:00:00Z",
+                        "updated_at":  "2026-01-01T00:00:00Z",
+                        "show_in_menu":  true
+                    }
     }
 ]

@@ -10,7 +10,7 @@ class ProfesionalesApiTest(BaseAuthFixtureTest):
     """Tests de /profesionales/ — alta y gestión de cuentas de profesionales."""
 
     def setUp(self):
-        self.client.force_authenticate(Usuario.objects.get(email="ayudante@prosane.test"))
+        self.client.force_authenticate(Usuario.objects.get(email="administrativo@prosane.test"))
 
     def _list_url(self):
         return reverse("profesionales-list-create")
@@ -48,7 +48,7 @@ class ProfesionalesApiTest(BaseAuthFixtureTest):
         self.assertIn("medico@prosane.test", emails)
         self.assertIn("odontologo@prosane.test", emails)
         self.assertNotIn("escuela@prosane.test", emails)
-        self.assertNotIn("ayudante@prosane.test", emails)
+        self.assertNotIn("administrativo@prosane.test", emails)
 
     def test_crear_profesional(self):
         res = self.client.post(self._list_url(), self._payload(), format="json")
@@ -57,7 +57,7 @@ class ProfesionalesApiTest(BaseAuthFixtureTest):
         self.assertEqual(res.data["matricula"], "99999999")
         usuario = Usuario.objects.get(email="nuevo@medico.test")
         self.assertTrue(usuario.roles.filter(rol="medico").exists())
-        # La contraseña es temporal generada, no la enviada (igual que escuela/ayudante)
+        # La contraseña es temporal generada, no la enviada (igual que escuela/administrativo)
         self.assertTrue(usuario.must_change_password)
         self.assertIsNotNone(usuario.temporal_password_expires_at)
         self.assertFalse(usuario.check_password("clave123"))

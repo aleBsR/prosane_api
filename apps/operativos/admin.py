@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Operativo, OperativoProfesional, OperativoAlumno
+from .models import AuditoriaDocumento, Operativo, OperativoProfesional, OperativoAlumno
 
 
 class OperativoProfesionalInline(admin.TabularInline):
@@ -35,3 +35,17 @@ class OperativoAlumnoAdmin(admin.ModelAdmin):
     list_display = ['apellido', 'nombre', 'dni', 'operativo', 'estado']
     list_filter = ['estado']
     search_fields = ['apellido', 'nombre', 'dni']
+
+
+@admin.register(AuditoriaDocumento)
+class AuditoriaDocumentoAdmin(admin.ModelAdmin):
+    list_display = ['created_at', 'tipo', 'actor', 'operativo', 'alumno', 'ip']
+    list_filter = ['tipo']
+    search_fields = ['actor__email']
+    readonly_fields = ['actor', 'operativo', 'alumno', 'tipo', 'ip', 'created_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

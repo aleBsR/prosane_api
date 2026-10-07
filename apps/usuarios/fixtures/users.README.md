@@ -16,7 +16,7 @@ La contraseña de los fixtures es **`prosane123`** para todos los usuarios.
 - `medico1@prosane.test` → rol **medico**
 - `odontologo@prosane.test` → rol **odontologo**
 - `odontologo1@prosane.test` → rol **odontologo**
-- `ayudante@prosane.test` → rol **ayudante**
+- `administrativo@prosane.test` → rol **administrativo**
 - `tutor@prosane.test` → rol **tutor**
 - `escuela@prosane.test` → rol **escuela**
 

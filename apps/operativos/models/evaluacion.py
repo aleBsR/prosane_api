@@ -56,6 +56,7 @@ class EvaluacionMedica(BaseModel):
     vacunas_indicadas = models.TextField(blank=True, default='')
 
     # Hoja 2 — antropometría
+    antropometria_evaluada = models.BooleanField(default=True)
     peso = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     talla = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     imc = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
@@ -63,6 +64,7 @@ class EvaluacionMedica(BaseModel):
     percentil_imc = models.CharField(max_length=20, choices=PERCENTIL_IMC_CHOICES, blank=True, default='')
 
     # Hoja 2 — presión arterial
+    presion_evaluada = models.BooleanField(default=True)
     pas = models.IntegerField(null=True, blank=True)
     pad = models.IntegerField(null=True, blank=True)
     presion_clasificacion = models.CharField(max_length=30, blank=True, default='')
@@ -122,13 +124,15 @@ class EvaluacionOdontologica(BaseModel):
     ensenanza_cepillado = models.BooleanField(default=False)
     alta_basica = models.BooleanField(default=False)
 
-    # Índice CPO (dientes permanentes) / ceo (dientes temporarios)
-    cpo_c = models.IntegerField(null=True, blank=True)
-    cpo_p = models.IntegerField(null=True, blank=True)
-    cpo_o = models.IntegerField(null=True, blank=True)
-    ceo_c = models.IntegerField(null=True, blank=True)
-    ceo_e = models.IntegerField(null=True, blank=True)
-    ceo_o = models.IntegerField(null=True, blank=True)
+    # Índice CPO (dientes permanentes) / ceo (dientes temporarios).
+    # Son checks (se hizo alguno / no), como en la planilla física:
+    # no se registran cantidades.
+    cpo_c = models.BooleanField(default=False)
+    cpo_p = models.BooleanField(default=False)
+    cpo_o = models.BooleanField(default=False)
+    ceo_c = models.BooleanField(default=False)
+    ceo_e = models.BooleanField(default=False)
+    ceo_o = models.BooleanField(default=False)
 
     # odontograma: {"18": "realizar|realizado|...", ...} por pieza dental
     odontograma = models.JSONField(default=dict, blank=True)

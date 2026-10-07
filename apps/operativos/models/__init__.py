@@ -2,6 +2,7 @@ from apps.operativos.models.operativo import Operativo
 from apps.operativos.models.profesional import OperativoProfesional
 from apps.operativos.models.alumno import OperativoAlumno
 from apps.operativos.models.evaluacion import EvaluacionMedica, EvaluacionOdontologica
+from apps.operativos.models.auditoria import AuditoriaDocumento
 
 __all__ = [
     'Operativo',
@@ -9,4 +10,5 @@ __all__ = [
     'OperativoAlumno',
     'EvaluacionMedica',
     'EvaluacionOdontologica',
+    'AuditoriaDocumento',
 ]

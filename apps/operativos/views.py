@@ -6,6 +6,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from apps.usuarios.permissions import require_action, require_any_action
+from apps.auditoria.helpers import auditar_cambio
+from apps.auditoria.models import AuditoriaCambio
 from .models import (
     Operativo, OperativoProfesional, OperativoAlumno,
     EvaluacionMedica, EvaluacionOdontologica,
@@ -31,6 +33,29 @@ def _auto_evaluar_si_completo(alumno: OperativoAlumno):
             alumno.save(update_fields=['estado', 'updated_at'])
     except Exception:
         pass
+
+
+def _detalle_operativo(operativo):
+    return {
+        'nombre': operativo.nombre,
+        'escuela': operativo.escuela.nombre if operativo.escuela_id else None,
+        'fecha': str(operativo.fecha) if operativo.fecha else None,
+        'estado': operativo.estado,
+    }
+
+
+def _detalle_alumno(alumno):
+    return {
+        'dni': alumno.dni,
+        'apellido': alumno.apellido,
+        'nombre': alumno.nombre,
+    }
+
+
+def _auditar_transicion(request, operativo, de):
+    auditar_cambio(request, 'operativo', AuditoriaCambio.CAMBIAR_ESTADO,
+                   entidad_id=operativo.id,
+                   detalle={**_detalle_operativo(operativo), 'de': de, 'a': operativo.estado})
 
 
 # ──────────────────────────────────────────────
@@ -60,7 +85,9 @@ class OperativoListCreateView(APIView):
     def post(self, request):
         serializer = OperativoDetailSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(created_by=request.user)
+        operativo = serializer.save(created_by=request.user)
+        auditar_cambio(request, 'operativo', AuditoriaCambio.CREAR,
+                       entidad_id=operativo.id, detalle=_detalle_operativo(operativo))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -88,6 +115,10 @@ class OperativoDetailView(APIView):
         serializer = OperativoDetailSerializer(operativo, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        auditar_cambio(request, 'operativo', AuditoriaCambio.EDITAR,
+                       entidad_id=operativo.id,
+                       detalle={**_detalle_operativo(operativo),
+                                'campos': sorted(request.data.keys())})
         return Response(serializer.data)
 
     def patch(self, request, pk):
@@ -99,11 +130,18 @@ class OperativoDetailView(APIView):
         serializer = OperativoDetailSerializer(operativo, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        auditar_cambio(request, 'operativo', AuditoriaCambio.EDITAR,
+                       entidad_id=operativo.id,
+                       detalle={**_detalle_operativo(operativo),
+                                'campos': sorted(request.data.keys())})
         return Response(serializer.data)
 
     def delete(self, request, pk):
         operativo = queries.obtener_operativo_visible(request.user, pk)
+        de = operativo.estado
         services.cancelar_operativo(operativo.id)
+        operativo.refresh_from_db()
+        _auditar_transicion(request, operativo, de)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -116,7 +154,9 @@ class OperativoConfirmarView(APIView):
     def post(self, request, pk):
         operativo = queries.obtener_operativo_visible(request.user, pk)
         try:
+            de = operativo.estado
             op = services.confirmar_operativo(operativo.id)
+            _auditar_transicion(request, op, de)
             serializer = OperativoDetailSerializer(op)
             return Response(serializer.data)
         except ValueError as e:
@@ -129,7 +169,9 @@ class OperativoFinalizarView(APIView):
     def post(self, request, pk):
         operativo = queries.obtener_operativo_visible(request.user, pk)
         try:
+            de = operativo.estado
             op = services.finalizar_operativo(operativo.id)
+            _auditar_transicion(request, op, de)
             serializer = OperativoDetailSerializer(op)
             return Response(serializer.data)
         except ValueError as e:
@@ -142,7 +184,9 @@ class OperativoCancelarView(APIView):
     def post(self, request, pk):
         operativo = queries.obtener_operativo_visible(request.user, pk)
         try:
+            de = operativo.estado
             op = services.cancelar_operativo(operativo.id)
+            _auditar_transicion(request, op, de)
             serializer = OperativoDetailSerializer(op)
             return Response(serializer.data)
         except ValueError as e:
@@ -155,7 +199,9 @@ class OperativoIniciarView(APIView):
     def post(self, request, pk):
         operativo = queries.obtener_operativo_visible(request.user, pk)
         try:
+            de = operativo.estado
             op = services.iniciar_operativo(operativo.id)
+            _auditar_transicion(request, op, de)
             serializer = OperativoDetailSerializer(op)
             return Response(serializer.data)
         except ValueError as e:
@@ -219,6 +265,13 @@ class OperativoProfesionalAssignView(APIView):
         try:
             op = services.asignar_profesional(operativo.id, profesional_id, rol)
             serializer = OperativoProfesionalSerializer(op)
+            from apps.usuarios.models import Usuario as _Usuario
+            prof = _Usuario.objects.filter(pk=op.profesional_id).first()
+            auditar_cambio(request, 'operativo_profesional', AuditoriaCambio.CREAR,
+                           entidad_id=op.id,
+                           detalle={'operativo': str(operativo.id),
+                                    'profesional': prof.email if prof else str(op.profesional_id),
+                                    'rol_en_operativo': op.rol_en_operativo})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
@@ -229,7 +282,14 @@ class OperativoProfesionalRemoveView(APIView):
 
     def delete(self, request, pk, prof_pk):
         try:
+            rel = OperativoProfesional.objects.filter(operativo_id=pk, pk=prof_pk).first()
+            detalle = {'operativo': str(pk)}
+            if rel is not None:
+                detalle['rol_en_operativo'] = rel.rol_en_operativo
+                detalle['profesional_id'] = str(rel.profesional_id)
             services.remover_profesional(pk, prof_pk)
+            auditar_cambio(request, 'operativo_profesional', AuditoriaCambio.ELIMINAR,
+                           entidad_id=rel.id if rel is not None else None, detalle=detalle)
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
@@ -261,7 +321,9 @@ class OperativoAlumnoListCreateView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
         serializer = OperativoAlumnoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(operativo=operativo)
+        alumno = serializer.save(operativo=operativo)
+        auditar_cambio(request, 'alumno_operativo', AuditoriaCambio.CREAR,
+                       entidad_id=alumno.id, detalle=_detalle_alumno(alumno))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -302,7 +364,14 @@ class OperativoAlumnoDetailView(APIView):
                 )
         serializer = OperativoAlumnoEstadoSerializer(alumno, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        estado_previo = alumno.estado
         serializer.save()
+        auditar_cambio(request, 'alumno_operativo', AuditoriaCambio.EDITAR,
+                       entidad_id=alumno.id,
+                       detalle={**_detalle_alumno(alumno),
+                                'campos': sorted(request.data.keys()),
+                                'estado_de': estado_previo,
+                                'estado_a': alumno.estado})
         return Response(serializer.data)
 
     def delete(self, request, pk, alumno_pk):
@@ -311,7 +380,10 @@ class OperativoAlumnoDetailView(APIView):
             services.exigir_operativo_mutable(alumno.operativo)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
+        detalle = _detalle_alumno(alumno)
         alumno.delete()
+        auditar_cambio(request, 'alumno_operativo', AuditoriaCambio.ELIMINAR,
+                       entidad_id=alumno.id, detalle=detalle)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -328,6 +400,15 @@ class OperativoAlumnoImportCSVView(APIView):
             )
         try:
             resultado = services.importar_csv(operativo.id, archivo)
+            detalle = {'operativo': _detalle_operativo(operativo)}
+            if isinstance(resultado, dict):
+                for k in ('creados', 'duplicados', 'errores', 'total_filas'):
+                    if k in resultado:
+                        v = resultado[k]
+                        detalle[k] = len(v) if isinstance(v, list) else v
+            detalle['archivo'] = getattr(archivo, 'name', '')
+            auditar_cambio(request, 'alumno_operativo', AuditoriaCambio.IMPORTAR,
+                           entidad_id=operativo.id, detalle=detalle)
             return Response(resultado)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
@@ -390,13 +471,24 @@ class EvaluacionMedicaView(APIView):
             services.exigir_operativo_en_curso(operativo)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
-        evaluacion, _ = EvaluacionMedica.objects.get_or_create(operativo_alumno=alumno)
+        evaluacion, creado = EvaluacionMedica.objects.get_or_create(operativo_alumno=alumno)
         serializer = EvaluacionMedicaSerializer(evaluacion, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        # Guardado parcial (wizard): solo cambia completada con flag
+        # explícito. Sin flag rige el comportamiento legacy (completada=True)
+        # para los clientes sin wizard.
+        datos = request.data if isinstance(request.data, dict) else {}
+        completada = bool(datos.get('completar', True))
         serializer.save(
             profesional=request.user,
             fecha_evaluacion=timezone.now(),
-            completada=True,
+            completada=completada,
+        )
+        auditar_cambio(
+            request, 'evaluacion_medica',
+            AuditoriaCambio.CREAR if creado else AuditoriaCambio.EDITAR,
+            entidad_id=evaluacion.id,
+            detalle={**_detalle_alumno(alumno), 'campos': sorted(request.data.keys())},
         )
         # Auto-evaluado si con esta carga quedó completo (E+A+M+O)
         alumno.refresh_from_db()
@@ -457,13 +549,24 @@ class EvaluacionOdontologicaView(APIView):
             services.exigir_operativo_en_curso(operativo)
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_409_CONFLICT)
-        evaluacion, _ = EvaluacionOdontologica.objects.get_or_create(operativo_alumno=alumno)
+        evaluacion, creado = EvaluacionOdontologica.objects.get_or_create(operativo_alumno=alumno)
         serializer = EvaluacionOdontologicaSerializer(evaluacion, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        # Guardado parcial (wizard): solo cambia completada con flag
+        # explícito. Sin flag rige el comportamiento legacy (completada=True)
+        # para los clientes sin wizard.
+        datos = request.data if isinstance(request.data, dict) else {}
+        completada = bool(datos.get('completar', True))
         serializer.save(
             profesional=request.user,
             fecha_evaluacion=timezone.now(),
-            completada=True,
+            completada=completada,
+        )
+        auditar_cambio(
+            request, 'evaluacion_odontologica',
+            AuditoriaCambio.CREAR if creado else AuditoriaCambio.EDITAR,
+            entidad_id=evaluacion.id,
+            detalle={**_detalle_alumno(alumno), 'campos': sorted(request.data.keys())},
         )
         alumno.refresh_from_db()
         _auto_evaluar_si_completo(alumno)
@@ -488,7 +591,12 @@ class OperativoCompletitudView(APIView):
 
 
 class SeccionEscuelaView(APIView):
-    permission_classes = [require_action('cargarSeccionEscuela')]
+    def get_permissions(self):
+        # Lectura abierta a quien ve el operativo (el administrativo lee
+        # pero no modifica); escritura solo con cargarSeccionEscuela.
+        if self.request.method == 'GET':
+            return [require_any_action('cargarSeccionEscuela', 'verOperativo')()]
+        return [require_action('cargarSeccionEscuela')()]
 
     def get(self, request, pk, alumno_pk):
         operativo = queries.obtener_operativo_visible(request.user, pk)
@@ -505,7 +613,14 @@ class SeccionEscuelaView(APIView):
         alumno = OperativoAlumno.objects.get(operativo=operativo, pk=alumno_pk)
         serializer = SeccionEscuelaSerializer(alumno, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save(escuela_completado=True)
+        # Guardado parcial (wizard): solo marca completado con flag explícito.
+        # Sin flag rige el comportamiento legacy (completado=True).
+        datos = request.data if isinstance(request.data, dict) else {}
+        serializer.save(escuela_completado=bool(datos.get('completar', True)))
+        auditar_cambio(request, 'seccion_escuela', AuditoriaCambio.EDITAR,
+                       entidad_id=alumno.id,
+                       detalle={**_detalle_alumno(alumno),
+                                'campos': sorted(request.data.keys())})
         alumno.refresh_from_db()
         _auto_evaluar_si_completo(alumno)
         return Response(serializer.data)
@@ -632,12 +747,56 @@ def _validar_longitudes_datos(data):
     return errores
 
 
+def _datos_familia_consentimiento(alumno):
+    """Bloque familia + consentimiento para profesionales (Anexo I, solo lectura).
+
+    Solo nombres/estados, sin valores clínicos (minimización, Ley N° 25.326).
+    """
+    paciente = alumno.paciente
+    if not paciente:
+        return {'antecedente_familiar': None, 'consentimiento': None, 'tutor': None}
+    from apps.antecedentes.models import AntecedenteFamiliar
+    ant_fam = AntecedenteFamiliar.objects.filter(paciente=paciente).first()
+    tutor = getattr(paciente, 'tutor', None)
+    tutor_persona = getattr(tutor, 'persona', None) if tutor else None
+    return {
+        'antecedente_familiar': {
+            'problemas_salud': ant_fam.problemas_salud if ant_fam else None,
+            'detalle_problema_salud': ant_fam.detalle_problema_salud if ant_fam else None,
+            'familiar_con_muerte_subita': ant_fam.familiar_con_muerte_subita if ant_fam else None,
+        } if ant_fam else None,
+        'consentimiento': {
+            'aceptado': bool(paciente.consentimiento_aceptado),
+            'fecha': paciente.fecha_consentimiento.isoformat() if paciente.fecha_consentimiento else None,
+        },
+        'tutor': {
+            'nombre': tutor_persona.nombre if tutor_persona else '',
+            'apellido': tutor_persona.apellido if tutor_persona else '',
+            'dni': tutor_persona.dni if tutor_persona else '',
+            'parentesco': tutor.parentesco if tutor else '',
+        } if tutor else None,
+    }
+
+
+def _auditar_lectura_profesional(request, alumno):
+    """Audita lecturas de datos sensibles por médicos/odontólogos (Anexo I 6)."""
+    try:
+        roles = {r.rol for r in request.user.roles.all()}
+    except Exception:
+        roles = set()
+    if roles & {'medico', 'odontologo'}:
+        auditar_cambio(request, 'alumno_datos', AuditoriaCambio.LEER,
+                       entidad_id=alumno.id,
+                       detalle={**_detalle_alumno(alumno),
+                                'incluye': ['antecedente_familiar', 'consentimiento', 'tutor']})
+
+
 class OperativoAlumnoDatosView(APIView):
     """GET/PATCH datos completos del alumno para escuela (igual que tutor).
 
     Permite a escuela cargar/editar datos personales + antecedentes del Paciente
     vinculado al OperativoAlumno. Solo si el operativo pertenece a su escuela.
-    GET en solo lectura (finalizado) también para ayudante/superadmin con verOperativo.
+    GET en solo lectura (finalizado) también para administrativo/superadmin con verOperativo.
     """
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -724,6 +883,8 @@ class OperativoAlumnoDatosView(APIView):
                 'escuela_completado': alumno.escuela_completado,
                 'antecedentes_completado': alumno.antecedentes_completado,
             }
+            data.update(_datos_familia_consentimiento(alumno))
+            _auditar_lectura_profesional(request, alumno)
             return Response(data)
         # Sin paciente: devolver snapshot para que escuela lo complete
         return Response({
@@ -773,6 +934,7 @@ class OperativoAlumnoDatosView(APIView):
             )
 
         try:
+            tenia_paciente = bool(alumno.paciente_id)
             # Actualizar snapshot del OperativoAlumno si vienen esos campos
             for field in ['apellido', 'nombre', 'tipo_dni', 'dni', 'sexo']:
                 if field in data:
@@ -894,10 +1056,21 @@ class OperativoAlumnoDatosView(APIView):
                 alumno.paciente = paciente
                 alumno.save(update_fields=['paciente'])
 
-            alumno.antecedentes_completado = True
+            # Guardado parcial (wizard): solo marca completado con flag
+            # explícito. Sin flag rige el comportamiento legacy.
+            datos_req = data if isinstance(data, dict) else {}
+            alumno.antecedentes_completado = bool(datos_req.get('completar', True))
             alumno.save(update_fields=['antecedentes_completado'])
             alumno.refresh_from_db()
             _auto_evaluar_si_completo(alumno)
+            detalle_datos = {**_detalle_alumno(alumno)}
+            if isinstance(data, dict):
+                detalle_datos['campos'] = sorted(str(k) for k in data.keys())
+                if isinstance(data.get('antecedentes'), dict):
+                    detalle_datos['antecedentes_campos'] = sorted(str(k) for k in data['antecedentes'].keys())
+            detalle_datos['paciente'] = 'actualizado' if tenia_paciente else 'creado'
+            auditar_cambio(request, 'datos_alumno', AuditoriaCambio.EDITAR,
+                           entidad_id=alumno.id, detalle=detalle_datos)
         except (IntegrityError, DataError):
             return Response(
                 {'error': 'No se pudieron guardar los datos. Verificá que no haya DNIs duplicados ni valores demasiado largos.'},
@@ -910,6 +1083,24 @@ class OperativoAlumnoDatosView(APIView):
 # ──────────────────────────────────────────────
 #  Constancia por alumno (PDF)
 # ──────────────────────────────────────────────
+def _ip_cliente(request):
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '') or ''
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+
+def _auditar_documento(request, operativo, alumno, tipo):
+    from .models import AuditoriaDocumento
+    AuditoriaDocumento.objects.create(
+        actor=request.user if getattr(request.user, 'is_authenticated', False) else None,
+        operativo=operativo,
+        alumno=alumno,
+        tipo=tipo,
+        ip=_ip_cliente(request),
+    )
+
+
 class ConstanciaAlumnoView(APIView):
     permission_classes = [require_action('verOperativo')]
 
@@ -926,11 +1117,105 @@ class ConstanciaAlumnoView(APIView):
             return Response({'error': 'Alumno no encontrado en este operativo'}, status=status.HTTP_404_NOT_FOUND)
         # Ausente también tiene constancia; para pendiente/incompleto no se bloquea pero se informa en PDF
         from .services_constancia import generar_constancia_pdf
+        from .models import AuditoriaDocumento
         pdf_bytes = generar_constancia_pdf(operativo, alumno)
+        _auditar_documento(request, operativo, alumno, AuditoriaDocumento.CONSTANCIA)
         filename = f"constancia-{alumno.dni or alumno_pk}.pdf"
         resp = HttpResponse(pdf_bytes, content_type='application/pdf')
         resp['Content-Disposition'] = f'inline; filename="{filename}"'
         return resp
+
+
+# ──────────────────────────────────────────────
+#  Planilla por alumno (PDF réplica del papel)
+# ──────────────────────────────────────────────
+class PlanillaAlumnoView(APIView):
+    permission_classes = [require_action('verOperativo')]
+
+    def get(self, request, pk, alumno_pk):
+        operativo = queries.obtener_operativo_visible(request.user, pk)
+        if operativo.estado != Operativo.FINALIZADO:
+            return Response(
+                {'error': 'La planilla solo está disponible cuando el operativo está finalizado'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            alumno = OperativoAlumno.objects.select_related('curso', 'operativo__escuela').get(operativo=operativo, pk=alumno_pk)
+        except OperativoAlumno.DoesNotExist:
+            return Response({'error': 'Alumno no encontrado en este operativo'}, status=status.HTTP_404_NOT_FOUND)
+        from .services_planilla import generar_planilla_pdf
+        from .models import AuditoriaDocumento
+        pdf_bytes = generar_planilla_pdf(operativo, alumno)
+        _auditar_documento(request, operativo, alumno, AuditoriaDocumento.PLANILLA)
+        filename = f"planilla-{alumno.dni or alumno_pk}.pdf"
+        resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+        resp['Content-Disposition'] = f'inline; filename="{filename}"'
+        return resp
+
+
+DERIVACION_LABELS = {
+    'odontologia': 'Odontología',
+    'oftalmologia': 'Oftalmología',
+    'nutricion': 'Nutrición',
+    'vacunatorio': 'Vacunatorio',
+    'pediatria': 'Pediatría',
+    'fonoaudiologia': 'Fonoaudiología',
+}
+
+
+class DerivacionesOperativoView(APIView):
+    """GET /operativos/<pk>/derivaciones/ — derivaciones generadas (Anexo I 4.6).
+
+    Agrega las derivaciones de las evaluaciones médicas del operativo.
+    Filtros: ?especialidad=odontologia|oftalmologia|... (ver DERIVACION_LABELS).
+    Permiso verOperativo: admin ve todo, profesional solo sus operativos.
+    """
+    permission_classes = [require_action('verOperativo')]
+
+    def get(self, request, pk):
+        operativo = queries.obtener_operativo_visible(request.user, pk)
+        solo = (request.query_params.get('especialidad') or '').strip().lower()
+        if solo and solo not in DERIVACION_LABELS:
+            return Response(
+                {'error': f'Especialidad inválida. Opciones: {", ".join(sorted(DERIVACION_LABELS))}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        evals = (
+            EvaluacionMedica.objects.filter(operativo_alumno__operativo=operativo)
+            .select_related('operativo_alumno__curso', 'profesional')
+            .order_by('operativo_alumno__apellido', 'operativo_alumno__nombre')
+        )
+        items = []
+        for ev in evals:
+            derivs = ev.derivaciones or {}
+            if not isinstance(derivs, dict):
+                continue
+            for esp, dato in derivs.items():
+                if not isinstance(dato, dict) or not dato.get('deriva'):
+                    continue
+                if solo and esp != solo:
+                    continue
+                al = ev.operativo_alumno
+                items.append({
+                    'alumno_id': str(al.id),
+                    'apellido': al.apellido,
+                    'nombre': al.nombre,
+                    'dni': al.dni,
+                    'curso': str(al.curso) if al.curso_id else '',
+                    'especialidad': esp,
+                    'especialidad_label': DERIVACION_LABELS.get(esp, esp),
+                    'motivo': (dato.get('motivo') or '').strip(),
+                    'profesional': _nombre_profesional(ev.profesional),
+                    'fecha_evaluacion': ev.fecha_evaluacion.isoformat() if ev.fecha_evaluacion else None,
+                })
+        por_esp = {}
+        for it in items:
+            por_esp[it['especialidad']] = por_esp.get(it['especialidad'], 0) + 1
+        return Response({
+            'total': len(items),
+            'por_especialidad': por_esp,
+            'derivaciones': items,
+        })
 
 
 # ──────────────────────────────────────────────
@@ -952,19 +1237,25 @@ class ExportOperativoView(APIView):
 
         if formato == 'csv':
             from .services_export import generar_export_csv
+            from .models import AuditoriaDocumento
             data = generar_export_csv(operativo)
+            _auditar_documento(request, operativo, None, AuditoriaDocumento.EXPORT_CSV)
             resp = HttpResponse(data, content_type='text/csv; charset=utf-8')
             resp['Content-Disposition'] = f'attachment; filename="operativo-{operativo.id}.csv"'
             return resp
         if formato in ('excel', 'xlsx'):
             from .services_export import generar_export_excel
+            from .models import AuditoriaDocumento
             data = generar_export_excel(operativo)
+            _auditar_documento(request, operativo, None, AuditoriaDocumento.EXPORT_EXCEL)
             resp = HttpResponse(data, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             resp['Content-Disposition'] = f'attachment; filename="operativo-{operativo.id}.xlsx"'
             return resp
         # pdf default
         from .services_export import generar_export_pdf
+        from .models import AuditoriaDocumento
         data = generar_export_pdf(operativo)
+        _auditar_documento(request, operativo, None, AuditoriaDocumento.EXPORT_PDF)
         resp = HttpResponse(data, content_type='application/pdf')
         resp['Content-Disposition'] = f'inline; filename="operativo-{operativo.id}.pdf"'
         return resp

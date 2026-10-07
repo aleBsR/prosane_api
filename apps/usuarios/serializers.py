@@ -10,7 +10,8 @@ from apps.escuelas.models import Escuela
 from common.mails import TEMP_EXPIRY_HOURS, enviar_temporal, generar_temporal
 
 ROL_ESCUELA = 'escuela'
-ROL_AYUDANTE = 'ayudante'
+ROL_ADMINISTRATIVO = 'administrativo'
+ROL_SUPERADMIN = 'superadmin'
 
 
 class RolesSerializer(serializers.ModelSerializer):
@@ -75,7 +76,7 @@ class UsuarioEscuelaSerializer(serializers.ModelSerializer):
         return usuario
 
     def update(self, instance, validated_data):
-        # El admin/ayudante gestiona email/escuela/is_active, no la contraseña.
+        # El admin/administrativo gestiona email/escuela/is_active, no la contraseña.
         # La contraseña solo la cambia el propio usuario (ChangePasswordView) o vía reenvío de temporal.
         validated_data.pop('password', None)
         for field, value in validated_data.items():
@@ -84,14 +85,14 @@ class UsuarioEscuelaSerializer(serializers.ModelSerializer):
         return instance
 
 
-class UsuarioAyudanteSerializer(serializers.ModelSerializer):
-    """Alta y gestión de cuentas de ayudante (solo superadmin).
+class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
+    """Alta y gestión de cuentas de administrativo (solo superadmin).
 
     Espejo de UsuarioEscuelaSerializer pero sin vinculación a escuela: crea un
-    Usuario con rol `ayudante`.
+    Usuario con rol `administrativo`.
     """
     password = serializers.CharField(write_only=True, required=False, min_length=6)
-    rol = serializers.CharField(default=ROL_AYUDANTE, read_only=True)
+    rol = serializers.CharField(default=ROL_ADMINISTRATIVO, read_only=True)
 
     class Meta:
         model = Usuario
@@ -109,15 +110,66 @@ class UsuarioAyudanteSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('password', None)
         temp = generar_temporal()
-        rol = Rol.objects.filter(rol=ROL_AYUDANTE).first()
+        rol = Rol.objects.filter(rol=ROL_ADMINISTRATIVO).first()
         if rol is None:
             raise serializers.ValidationError(
-                {'detail': 'El rol "ayudante" no existe. Ejecutá seed_permissions.'}
+                {'detail': 'El rol "administrativo" no existe. Ejecutá seed_permissions.'}
             )
         usuario = Usuario.objects.create_user(
             password=temp,
             must_change_password=True,
             temporal_password_expires_at=timezone.now() + timedelta(hours=TEMP_EXPIRY_HOURS),
+            **validated_data,
+        )
+        RoleUsuario.objects.create(id_user=usuario, id_rol=rol)
+        enviar_temporal(usuario.email, temp)
+        return usuario
+
+    def update(self, instance, validated_data):
+        validated_data.pop('password', None)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.save()
+        return instance
+
+
+class UsuarioSuperadminSerializer(serializers.ModelSerializer):
+    """Alta y gestión de cuentas de superadmin (solo otro superadmin).
+
+    Espejo de UsuarioAdministrativoSerializer pero con rol `superadmin` y
+    flags `is_staff`/`is_superuser` en True. La contraseña siempre es una
+    temporal de 72h que el nuevo superadmin debe cambiar al ingresar.
+    """
+    password = serializers.CharField(write_only=True, required=False, min_length=6)
+    rol = serializers.CharField(default=ROL_SUPERADMIN, read_only=True)
+
+    class Meta:
+        model = Usuario
+        fields = ['id', 'email', 'password', 'rol', 'is_active']
+        read_only_fields = ['id', 'rol']
+
+    def validate_email(self, value):
+        qs = Usuario.objects.filter(email__iexact=value)
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError('Ya existe un usuario con este email.')
+        return value
+
+    def create(self, validated_data):
+        validated_data.pop('password', None)
+        temp = generar_temporal()
+        rol = Rol.objects.filter(rol=ROL_SUPERADMIN).first()
+        if rol is None:
+            raise serializers.ValidationError(
+                {'detail': 'El rol "superadmin" no existe. Ejecutá seed_permissions.'}
+            )
+        usuario = Usuario.objects.create_user(
+            password=temp,
+            must_change_password=True,
+            temporal_password_expires_at=timezone.now() + timedelta(hours=TEMP_EXPIRY_HOURS),
+            is_staff=True,
+            is_superuser=True,
             **validated_data,
         )
         RoleUsuario.objects.create(id_user=usuario, id_rol=rol)

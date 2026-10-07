@@ -62,7 +62,36 @@ class EscuelaSerializer(serializers.ModelSerializer):
             'domicilio', 'telefono', 'activa', 'usuarios_asociados',
             'perfil_completo', 'campos_faltantes',
         ]
-    read_only_fields = ['id', 'perfil_completo', 'campos_faltantes']
+        read_only_fields = ['id', 'perfil_completo', 'campos_faltantes']
+
+        # El CUE es única de escuelas ACTIVAS: una escuela desactivada no debe
+        # bloquear recrear/activar el mismo establecimiento. La unicidad manual
+        # se resuelve en validate_cue() + create() (reactiva la inactiva).
+        extra_kwargs = {
+            'cue': {'validators': []},
+        }
+
+    def validate_cue(self, value):
+        value = (value or '').strip() or None
+        if value:
+            qs = Escuela.objects.filter(cue__iexact=value)
+            if self.instance is not None:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exclude(activa=False).exists():
+                raise serializers.ValidationError(
+                    'Ya existe una escuela activa con ese CUE.'
+                )
+        return value
+
+    def _aplicar_domicilio(self, instance, domicilio_data):
+        if not domicilio_data:
+            return
+        if instance.domicilio:
+            for key, value in domicilio_data.items():
+                setattr(instance.domicilio, key, value)
+            instance.domicilio.save()
+        else:
+            instance.domicilio = Domicilio.objects.create(**domicilio_data)
 
     def get_perfil_completo(self, obj):
         return perfil_completitud(obj)[0]
@@ -75,6 +104,19 @@ class EscuelaSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         domicilio_data = validated_data.pop('domicilio', None)
+        cue = validated_data.get('cue')
+        if cue:
+            inactiva = Escuela.objects.filter(cue__iexact=cue, activa=False).first()
+            if inactiva:
+                # Recrear = reactivar el mismo establecimiento (seguía en la DB
+                # con activa=False tras el "borrado" de la web/móvil).
+                for field, value in validated_data.items():
+                    setattr(inactiva, field, value)
+                inactiva.activa = True
+                self._aplicar_domicilio(inactiva, domicilio_data)
+                inactiva.save()
+                self.instance = inactiva
+                return inactiva
         if domicilio_data:
             domicilio = Domicilio.objects.create(**domicilio_data)
             validated_data['domicilio'] = domicilio
@@ -82,13 +124,7 @@ class EscuelaSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         domicilio_data = validated_data.pop('domicilio', None)
-        if domicilio_data:
-            if instance.domicilio:
-                for key, value in domicilio_data.items():
-                    setattr(instance.domicilio, key, value)
-                instance.domicilio.save()
-            else:
-                instance.domicilio = Domicilio.objects.create(**domicilio_data)
+        self._aplicar_domicilio(instance, domicilio_data)
         return super().update(instance, validated_data)
 
 

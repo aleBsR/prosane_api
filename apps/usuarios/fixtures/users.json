@@ -39,7 +39,7 @@
     "model": "usuarios.usuario",
     "pk": "c0000000-0000-0000-0000-000000000004",
     "fields": {
-      "email": "ayudante@prosane.test",
+      "email": "administrativo@prosane.test",
       "password": "pbkdf2_sha256$1200000$yfLMCrTTzV8WX98Sh86b9D$xg0KRdF/N7O3cYJ0w1eeMdk8TCjLs3iiAwvOmVrzDkQ=",
       "is_superuser": false,
       "is_staff": false,
@@ -130,7 +130,7 @@
     "pk": 9004,
     "fields": {
       "id_user": "c0000000-0000-0000-0000-000000000004",
-      "id_rol": "4e9d0fc2-d6b8-5c60-a421-bd7d1176f40f",
+      "id_rol": "0a0a929c-9068-513e-96bd-0845cea37834",
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
     }

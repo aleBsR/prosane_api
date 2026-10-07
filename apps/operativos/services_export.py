@@ -45,8 +45,12 @@ def _alumno_row_dict(alumno):
         odonto = alumno.evaluacion_odontologica
         odonto_ok = bool(odonto.completada)
         odonto_salud = odonto.salud_bucal
-        odonto_cpo = f"{odonto.cpo_c or 0}/{odonto.cpo_p or 0}/{odonto.cpo_o or 0}"
-        odonto_ceo = f"{odonto.ceo_c or 0}/{odonto.ceo_e or 0}/{odonto.ceo_o or 0}"
+        odonto_cpo = (
+            f"{int(bool(odonto.cpo_c))}/{int(bool(odonto.cpo_p))}/{int(bool(odonto.cpo_o))}"
+        )
+        odonto_ceo = (
+            f"{int(bool(odonto.ceo_c))}/{int(bool(odonto.ceo_e))}/{int(bool(odonto.ceo_o))}"
+        )
     except Exception:
         odonto_ok = False
         odonto_salud = ''

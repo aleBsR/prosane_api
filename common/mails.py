@@ -1,7 +1,7 @@
 """Helper único para los mails de contraseña temporal (opción A).
 
 Centraliza asunto/cuerpo y la URL de ingreso (settings.LOGIN_URL) para que los
-envíos —alta escuela, alta ayudante, alta profesional y reenvíos— compartan el
+envíos —alta escuela, alta administrativo, alta profesional y reenvíos— compartan el
 mismo texto y estética (colores de la app: violeta #7C5CFC, Nunito/Rubik).
 
 En dev el EMAIL_BACKEND es console (el mail se imprime en terminal); en

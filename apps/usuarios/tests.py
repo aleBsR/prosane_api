@@ -77,9 +77,9 @@ class SeedPermissionsTest(TestCase):
 
         call_command("seed_permissions", verbosity=0)
 
-        self.assertEqual(Action.objects.filter(is_active=True).count(), 31)
-        self.assertTrue(Rol.objects.filter(rol="ayudante").exists())
-        self.assertTrue(ActionRole.objects.filter(role__rol="ayudante").exists())
+        self.assertEqual(Action.objects.filter(is_active=True).count(), 32)
+        self.assertTrue(Rol.objects.filter(rol="administrativo").exists())
+        self.assertTrue(ActionRole.objects.filter(role__rol="administrativo").exists())
 
 
 class MenuVisibilityTest(TestCase):
@@ -90,9 +90,9 @@ class MenuVisibilityTest(TestCase):
     def test_crud_contextual_fuera_del_menu_con_permiso_intacto(self):
         call_command("seed_permissions", verbosity=0)
         user = Usuario.objects.create_user(
-            email="ayudante-menu@test.com", password="test1234",
+            email="administrativo-menu@test.com", password="test1234",
         )
-        user.roles.add(Rol.objects.get(rol="ayudante"))
+        user.roles.add(Rol.objects.get(rol="administrativo"))
 
         menu = {a["name"] for a in effective_menu_actions(user)}
         permisos = {a["name"] for a in effective_actions(user)}
@@ -110,18 +110,18 @@ class MenuVisibilityTest(TestCase):
     @override_settings(SEEDS_ENABLED=True)
     def test_importar_csv_solo_escuela_y_superadmin(self):
         call_command("seed_permissions", verbosity=0)
-        ayudante = Usuario.objects.create_user(
-            email="ayudante-csv@test.com", password="test1234",
+        administrativo = Usuario.objects.create_user(
+            email="administrativo-csv@test.com", password="test1234",
         )
-        ayudante.roles.add(Rol.objects.get(rol="ayudante"))
+        administrativo.roles.add(Rol.objects.get(rol="administrativo"))
         escuela = Usuario.objects.create_user(
             email="escuela-csv@test.com", password="test1234",
         )
         escuela.roles.add(Rol.objects.get(rol="escuela"))
 
-        perms_ayudante = {a["name"] for a in effective_actions(ayudante)}
+        perms_administrativo = {a["name"] for a in effective_actions(administrativo)}
         perms_escuela = {a["name"] for a in effective_actions(escuela)}
-        self.assertNotIn("importarNominaOperativo", perms_ayudante)
+        self.assertNotIn("importarNominaOperativo", perms_administrativo)
         self.assertIn("importarNominaOperativo", perms_escuela)
 
     @override_settings(SEEDS_ENABLED=True)
@@ -187,7 +187,7 @@ class AuthAPITest(BaseAuthFixtureTest):
         self.assertIn("actions", res.data)
 
     def test_me_includes_actions(self):
-        user = Usuario.objects.get(email="ayudante@prosane.test")
+        user = Usuario.objects.get(email="administrativo@prosane.test")
         self.client.force_authenticate(user=user)
         url = reverse("auth-me")
         res = self.client.get(url)
@@ -199,7 +199,6 @@ class AuthAPITest(BaseAuthFixtureTest):
             "verOperativo", "crearOperativo", "editarOperativo",
             "confirmarOperativo", "finalizarOperativo", "iniciarOperativo", "cancelarOperativo",
             "gestionarProfesionalesEnOperativo",
-            "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
             "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
         ])
 
@@ -257,15 +256,14 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         return {a["name"] for a in res.data["actions"]}
 
-    def test_me_ayudante_tiene_acciones_de_escuela_operativo_y_usuarios(self):
-        user = Usuario.objects.get(email="ayudante@prosane.test")
+    def test_me_administrativo_tiene_acciones_de_escuela_operativo_y_usuarios(self):
+        user = Usuario.objects.get(email="administrativo@prosane.test")
         actions = self._action_names(user)
         self.assertEqual(actions, {
             "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
             "verOperativo", "crearOperativo", "editarOperativo",
             "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
             "gestionarProfesionalesEnOperativo",
-            "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
             "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
         })
 
@@ -289,6 +287,17 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
             "verOperativo", "gestionarEstadoAlumnoEnOperativo", "cargarEvaluacionMedica",
         })
 
+    def test_me_auditoria_en_categoria_propia_y_al_final(self):
+        user = Usuario.objects.get(email="superadmin@prosane.test")
+        self.client.force_authenticate(user=user)
+        res = self.client.get(reverse("auth-me"))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        actions = res.data["actions"]
+        audit = [a for a in actions if a["name"] == "verAuditoria"]
+        self.assertEqual(len(audit), 1)
+        self.assertEqual(audit[0]["category"], "auditoria")
+        self.assertEqual(actions[-1]["name"], "verAuditoria")
+
     def test_me_superadmin_ve_acciones_de_administracion(self):
         user = Usuario.objects.get(email="superadmin@prosane.test")
         actions = self._action_names(user)
@@ -299,7 +308,8 @@ class AuthDataDrivenIntegrationTest(BaseAuthFixtureTest):
             "gestionarProfesionalesEnOperativo", "importarNominaOperativo",
             "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela", "cargarAntecedentesNino",
             "verGestionUsuarios",
-            "gestionarUsuariosEscuela", "gestionarAyudantes", "gestionarProfesionales",
+            "gestionarUsuariosEscuela", "gestionarAdministrativos", "gestionarProfesionales",
+            "verAuditoria",
         })
 
 
@@ -544,61 +554,61 @@ class PasswordResetTest(BaseAuthFixtureTest):
         self.assertIsNotNone(PasswordResetCode.objects.get(code=code1).used_at)
 
 
-class UsuariosAyudantesApiTest(BaseAuthFixtureTest):
-    """Tests de /usuarios/ayudantes/ — alta de cuentas de ayudante (solo superadmin)."""
+class UsuariosAdministrativosApiTest(BaseAuthFixtureTest):
+    """Tests de /usuarios/administrativos/ — alta de cuentas de administrativo (solo superadmin)."""
 
     def setUp(self):
         self.client.force_authenticate(Usuario.objects.get(email="superadmin@prosane.test"))
 
     def _list_url(self):
-        return reverse("usuarios-ayudantes-list-create")
+        return reverse("usuarios-administrativos-list-create")
 
     def _detail_url(self, pk):
-        return reverse("usuario-ayudante-detail", kwargs={"pk": pk})
+        return reverse("usuario-administrativo-detail", kwargs={"pk": pk})
 
     def test_list_requiere_autenticacion(self):
         self.client.force_authenticate(user=None)
         res = self.client.get(self._list_url())
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_list_prohibido_para_ayudante(self):
-        # El ayudante NO puede crear a otros ayudantes (solo superadmin).
-        self.client.force_authenticate(Usuario.objects.get(email="ayudante@prosane.test"))
+    def test_list_prohibido_para_administrativo(self):
+        # El administrativo NO puede crear a otros administrativos (solo superadmin).
+        self.client.force_authenticate(Usuario.objects.get(email="administrativo@prosane.test"))
         res = self.client.get(self._list_url())
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_list_solo_usuarios_con_rol_ayudante(self):
+    def test_list_solo_usuarios_con_rol_administrativo(self):
         res = self.client.get(self._list_url())
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         emails = [u["email"] for u in res.data]
-        self.assertIn("ayudante@prosane.test", emails)
+        self.assertIn("administrativo@prosane.test", emails)
         self.assertNotIn("medico@prosane.test", emails)
 
-    def test_crear_usuario_ayudante(self):
+    def test_crear_usuario_administrativo(self):
         res = self.client.post(self._list_url(), {
-            "email": "nuevo@ayudante.test",
+            "email": "nuevo@administrativo.test",
         }, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(res.data["rol"], "ayudante")
-        usuario = Usuario.objects.get(email="nuevo@ayudante.test")
-        self.assertTrue(usuario.roles.filter(rol="ayudante").exists())
+        self.assertEqual(res.data["rol"], "administrativo")
+        usuario = Usuario.objects.get(email="nuevo@administrativo.test")
+        self.assertTrue(usuario.roles.filter(rol="administrativo").exists())
         self.assertTrue(usuario.must_change_password)
         self.assertFalse(usuario.check_password("clave123"))
 
-    def test_crear_sin_password_genera_temporal_ayudante(self):
-        res = self.client.post(self._list_url(), {"email": "nuevo2@ayudante.test"}, format="json")
+    def test_crear_sin_password_genera_temporal_administrativo(self):
+        res = self.client.post(self._list_url(), {"email": "nuevo2@administrativo.test"}, format="json")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        usuario = Usuario.objects.get(email="nuevo2@ayudante.test")
+        usuario = Usuario.objects.get(email="nuevo2@administrativo.test")
         self.assertTrue(usuario.must_change_password)
 
     def test_crear_email_duplicado_falla(self):
         res = self.client.post(self._list_url(), {
-            "email": "ayudante@prosane.test", "password": "clave123",
+            "email": "administrativo@prosane.test", "password": "clave123",
         }, format="json")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_patch_password_ignorado_solo_cambia_estado(self):
-        usuario = Usuario.objects.get(email="ayudante@prosane.test")
+        usuario = Usuario.objects.get(email="administrativo@prosane.test")
         old_hash = usuario.password
         res = self.client.patch(self._detail_url(usuario.pk), {
             "password": "nuevaClave99", "is_active": False,
@@ -610,13 +620,169 @@ class UsuariosAyudantesApiTest(BaseAuthFixtureTest):
         self.assertFalse(usuario.is_active)
 
     def test_delete_desactiva_la_cuenta(self):
-        usuario = Usuario.objects.get(email="ayudante@prosane.test")
+        usuario = Usuario.objects.get(email="administrativo@prosane.test")
         res = self.client.delete(self._detail_url(usuario.pk))
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
         usuario.refresh_from_db()
         self.assertFalse(usuario.is_active)
 
-    def test_detalle_404_si_no_es_usuario_ayudante(self):
+    def test_detalle_404_si_no_es_usuario_administrativo(self):
         medico = Usuario.objects.get(email="medico@prosane.test")
         res = self.client.get(self._detail_url(medico.pk))
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class UsuariosSuperadminApiTest(BaseAuthFixtureTest):
+    """Tests de /usuarios/superadmins/ — solo otro superadmin, con auditoría."""
+
+    def setUp(self):
+        self.client.force_authenticate(Usuario.objects.get(email="superadmin@prosane.test"))
+
+    def _list_url(self):
+        return reverse("usuarios-superadmin-list-create")
+
+    def _detail_url(self, pk):
+        return reverse("usuario-superadmin-detail", kwargs={"pk": pk})
+
+    def _resend_url(self, pk):
+        return reverse("usuario-superadmin-resend-temp", kwargs={"pk": pk})
+
+    def _crear_otro(self, email="otro@prosane.test"):
+        res = self.client.post(self._list_url(), {"email": email}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        return Usuario.objects.get(email=email)
+
+    def test_list_requiere_autenticacion(self):
+        self.client.force_authenticate(user=None)
+        res = self.client.get(self._list_url())
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_prohibido_para_administrativo(self):
+        self.client.force_authenticate(Usuario.objects.get(email="administrativo@prosane.test"))
+        res = self.client.get(self._list_url())
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_prohibido_para_medico(self):
+        self.client.force_authenticate(Usuario.objects.get(email="medico@prosane.test"))
+        res = self.client.post(self._list_url(), {"email": "x@prosane.test"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_solo_usuarios_con_rol_superadmin(self):
+        res = self.client.get(self._list_url())
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        emails = [u["email"] for u in res.data]
+        self.assertIn("superadmin@prosane.test", emails)
+        self.assertNotIn("medico@prosane.test", emails)
+
+    def test_crear_superadmin_con_temporal_y_auditoria(self):
+        from apps.usuarios.models import AuditoriaUsuario
+        res = self.client.post(self._list_url(), {"email": "nuevo@prosane.test"}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["rol"], "superadmin")
+        usuario = Usuario.objects.get(email="nuevo@prosane.test")
+        self.assertTrue(usuario.is_superuser)
+        self.assertTrue(usuario.is_staff)
+        self.assertTrue(usuario.roles.filter(rol="superadmin").exists())
+        self.assertTrue(usuario.must_change_password)
+        self.assertFalse(usuario.check_password("clave123"))
+        log = AuditoriaUsuario.objects.filter(accion="crear", objetivo=usuario).first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.actor.email, "superadmin@prosane.test")
+        self.assertEqual(log.ip, "127.0.0.1")
+
+    def test_crear_email_duplicado_falla(self):
+        res = self.client.post(self._list_url(), {
+            "email": "superadmin@prosane.test",
+        }, format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_resend_temp_y_auditoria(self):
+        from apps.usuarios.models import AuditoriaUsuario
+        otro = self._crear_otro()
+        res = self.client.post(self._resend_url(otro.pk), format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        otro.refresh_from_db()
+        self.assertTrue(otro.must_change_password)
+        self.assertTrue(
+            AuditoriaUsuario.objects.filter(accion="resend_temp", objetivo=otro).exists()
+        )
+
+    def test_delete_desactiva_y_audita(self):
+        from apps.usuarios.models import AuditoriaUsuario
+        otro = self._crear_otro()
+        res = self.client.delete(self._detail_url(otro.pk))
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        otro.refresh_from_db()
+        self.assertFalse(otro.is_active)
+        self.assertTrue(
+            AuditoriaUsuario.objects.filter(accion="desactivar", objetivo=otro).exists()
+        )
+
+    def test_delete_ultimo_superadmin_da_409(self):
+        unico = Usuario.objects.get(email="superadmin@prosane.test")
+        res = self.client.delete(self._detail_url(unico.pk))
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        unico.refresh_from_db()
+        self.assertTrue(unico.is_active)
+
+    def test_delete_propio_da_409(self):
+        otro = self._crear_otro()
+        self.client.force_authenticate(otro)
+        res = self.client.delete(self._detail_url(otro.pk))
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        otro.refresh_from_db()
+        self.assertTrue(otro.is_active)
+
+    def test_patch_desactivar_ultimo_da_409(self):
+        unico = Usuario.objects.get(email="superadmin@prosane.test")
+        res = self.client.patch(self._detail_url(unico.pk), {"is_active": False}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        unico.refresh_from_db()
+        self.assertTrue(unico.is_active)
+
+    def test_patch_reactivar_y_audita(self):
+        from apps.usuarios.models import AuditoriaUsuario
+        otro = self._crear_otro()
+        self.client.delete(self._detail_url(otro.pk))
+        res = self.client.patch(self._detail_url(otro.pk), {"is_active": True}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        otro.refresh_from_db()
+        self.assertTrue(otro.is_active)
+        self.assertTrue(
+            AuditoriaUsuario.objects.filter(accion="reactivar", objetivo=otro).exists()
+        )
+
+    def test_detalle_404_si_no_es_superadmin(self):
+        medico = Usuario.objects.get(email="medico@prosane.test")
+        res = self.client.get(self._detail_url(medico.pk))
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class BootstrapSuperuserTest(TestCase):
+    """El primer superadmin de producción sale de createsuperuser --noinput + env."""
+
+    def test_createsuperuser_noinput_con_env(self):
+        import os
+        from unittest import mock
+
+        env = {
+            "DJANGO_SUPERUSER_EMAIL": "root@prosane.test",
+            "DJANGO_SUPERUSER_PASSWORD": "ClaveSegura99",
+        }
+        with mock.patch.dict(os.environ, env):
+            call_command("createsuperuser", "--noinput", verbosity=0)
+        usuario = Usuario.objects.get(email="root@prosane.test")
+        self.assertTrue(usuario.is_superuser)
+        self.assertTrue(usuario.is_staff)
+        self.assertTrue(usuario.is_active)
+        self.assertTrue(usuario.check_password("ClaveSegura99"))
+
+
+class AccionAdministrativosRenameTest(TestCase):
+    """La acción gestionarAyudantes se renombró a gestionarAdministrativos."""
+
+    @override_settings(SEEDS_ENABLED=True)
+    def test_seed_usa_nombre_nuevo(self):
+        call_command("seed_permissions", verbosity=0)
+        self.assertTrue(Action.objects.filter(name="gestionarAdministrativos").exists())
+        self.assertFalse(Action.objects.filter(name="gestionarAyudantes").exists())

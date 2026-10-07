@@ -9,12 +9,23 @@ from django.shortcuts import get_object_or_404
 from apps.antecedentes.models import AntecedentePersonal
 from apps.escuelas.models import Escuela
 from apps.usuarios.permissions import require_action
+from apps.auditoria.helpers import auditar_cambio
+from apps.auditoria.models import AuditoriaCambio
 from .models import Paciente
 from .services.alumnos import (
     AlumnoEscuelaError,
     crear_alumno_escuela,
     listar_alumnos_escuela,
 )
+
+
+def _detalle_paciente(paciente):
+    persona = getattr(paciente, 'persona', None)
+    return {
+        'dni': persona.dni if persona else '',
+        'apellido': persona.apellido if persona else '',
+        'nombre': persona.nombre if persona else '',
+    }
 
 
 class PersonaAlumnoSerializer(serializers.Serializer):
@@ -60,6 +71,12 @@ class AntecedentePersonalInputSerializer(serializers.Serializer):
     edad_primera_menstruacion = serializers.IntegerField(required=False, default=0)
 
 
+class TutorVinculoSerializer(serializers.Serializer):
+    """Adulto responsable cargado por la escuela (sin cuenta de usuario)."""
+    persona = PersonaAlumnoSerializer()
+    parentesco = serializers.CharField(max_length=50)
+
+
 class AlumnoEscuelaCreateSerializer(serializers.Serializer):
     persona = PersonaAlumnoSerializer()
     domicilio = DomicilioAlumnoSerializer(required=False, default=dict)
@@ -72,6 +89,8 @@ class AlumnoEscuelaCreateSerializer(serializers.Serializer):
     curso_id = serializers.UUIDField(required=False, allow_null=True)
     operativo_id = serializers.UUIDField(required=False, allow_null=True)
     antecedentes = AntecedentePersonalInputSerializer(required=False, default=dict)
+    # Tutor obligatorio en el alta (primera etapa: la escuela carga todo).
+    tutor = TutorVinculoSerializer(required=True)
 
 
 class AntecedentePersonalOutputSerializer(serializers.ModelSerializer):
@@ -94,6 +113,7 @@ class AlumnoEscuelaOutputSerializer(serializers.ModelSerializer):
     escuela_nombre = serializers.CharField(source='escuela.nombre', read_only=True)
     operativos = serializers.SerializerMethodField()
     antecedentes = serializers.SerializerMethodField()
+    tutor = serializers.SerializerMethodField()
 
     class Meta:
         model = Paciente
@@ -101,8 +121,21 @@ class AlumnoEscuelaOutputSerializer(serializers.ModelSerializer):
             'id', 'persona', 'domicilio', 'escuela', 'escuela_nombre', 'edad',
             'tiene_cud', 'tipo_cobertura', 'nombre_cobertura',
             'telefono_fijo', 'celular', 'consentimiento_aceptado',
-            'operativos', 'antecedentes',
+            'operativos', 'antecedentes', 'tutor',
         ]
+
+    def get_tutor(self, obj):
+        tutor = getattr(obj, 'tutor', None)
+        if tutor is None:
+            return None
+        persona = getattr(tutor, 'persona', None)
+        return {
+            'id': str(tutor.id),
+            'nombre': getattr(persona, 'nombre', '') or '',
+            'apellido': getattr(persona, 'apellido', '') or '',
+            'dni': getattr(persona, 'dni', '') or '',
+            'parentesco': tutor.parentesco or '',
+        }
 
     def get_antecedentes(self, obj):
         try:
@@ -186,7 +219,76 @@ class EscuelaAlumnosListCreateView(APIView):
                 {exc.field or 'detail': [exc.message]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        auditar_cambio(request, 'paciente', AuditoriaCambio.CREAR,
+                       entidad_id=alumno.id, detalle=_detalle_paciente(alumno))
         return Response(AlumnoEscuelaOutputSerializer(alumno).data, status=status.HTTP_201_CREATED)
+
+
+class AlumnoTutorView(APIView):
+    """GET/POST /alumnos/<pk>/tutor/ — adulto responsable del alumno.
+
+    La escuela carga los datos del tutor en la primera etapa (sin cuenta).
+    Requiere registrarAlumnoEscuela y que el paciente sea de su escuela
+    (o superadmin).
+    """
+    def get_permissions(self):
+        return [require_action('registrarAlumnoEscuela')()]
+
+    def _get_paciente(self, request, pk):
+        escuela_id = request.user.escuela_id
+        if not escuela_id and not request.user.is_superuser:
+            return None
+        try:
+            paciente = Paciente.objects.select_related(
+                'escuela', 'tutor__persona').get(pk=pk)
+        except Paciente.DoesNotExist:
+            return None
+        if not request.user.is_superuser and str(paciente.escuela_id) != str(escuela_id):
+            return None
+        return paciente
+
+    def _tutor_data(self, paciente):
+        tutor = getattr(paciente, 'tutor', None)
+        if tutor is None:
+            return {'tutor': None}
+        persona = getattr(tutor, 'persona', None)
+        return {'tutor': {
+            'id': str(tutor.id),
+            'nombre': getattr(persona, 'nombre', '') or '',
+            'apellido': getattr(persona, 'apellido', '') or '',
+            'dni': getattr(persona, 'dni', '') or '',
+            'parentesco': tutor.parentesco or '',
+        }}
+
+    def get(self, request, pk):
+        paciente = self._get_paciente(request, pk)
+        if paciente is None:
+            return Response({'detail': 'Alumno no encontrado o sin permiso.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(self._tutor_data(paciente))
+
+    def post(self, request, pk):
+        from .services.alumnos import AlumnoEscuelaError, vincular_tutor
+        paciente = self._get_paciente(request, pk)
+        if paciente is None:
+            return Response({'detail': 'Alumno no encontrado o sin permiso.'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = TutorVinculoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            vincular_tutor(paciente, serializer.validated_data)
+        except AlumnoEscuelaError as exc:
+            return Response(
+                {exc.field or 'detail': [exc.message]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        paciente.refresh_from_db()
+        tutor = getattr(paciente, 'tutor', None)
+        persona_tutor = getattr(tutor, 'persona', None) if tutor else None
+        auditar_cambio(request, 'tutor', AuditoriaCambio.CREAR,
+                       entidad_id=tutor.id if tutor else None,
+                       detalle={**_detalle_paciente(paciente),
+                                'parentesco': tutor.parentesco if tutor else '',
+                                'tutor_dni': persona_tutor.dni if persona_tutor else ''})
+        return Response(self._tutor_data(paciente), status=status.HTTP_200_OK)
 
 
 class AlumnoAntecedentesView(APIView):
@@ -225,4 +327,8 @@ class AlumnoAntecedentesView(APIView):
         serializer.is_valid(raise_exception=True)
         from .services.alumnos import actualizar_antecedentes_paciente
         ant = actualizar_antecedentes_paciente(paciente, serializer.validated_data)
+        auditar_cambio(request, 'antecedente', AuditoriaCambio.EDITAR,
+                       entidad_id=ant.id,
+                       detalle={**_detalle_paciente(paciente),
+                                'campos': sorted(serializer.validated_data.keys())})
         return Response(AntecedentePersonalOutputSerializer(ant).data)

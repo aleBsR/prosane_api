@@ -635,6 +635,46 @@ class EscuelaAPITest(APITestCase):
         res = self.client.post(url, {'nombre': 'Nueva', 'cue': 'CUE-UNICO'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_recrear_escuela_desactivada_con_mismo_cue_la_reactiva(self):
+        # Flujo del reporte: la web desactivó "San Agustin"; el móvil no la
+        # listaba (?activa=true) y el alta fallaba con "ya existe" aunque no
+        # se viera. Ahora recrearla con el mismo CUE debe reactivarla.
+        inactiva = Escuela.objects.create(nombre='San Agustin', cue='123456', activa=False)
+        url = reverse('escuela-list-create')
+        res = self.client.post(url, {'nombre': 'San Agustin', 'cue': '123456'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data['id'], str(inactiva.id))
+        inactiva.refresh_from_db()
+        self.assertTrue(inactiva.activa)
+
+    def test_desactivar_y_recrear_por_api_reactiva(self):
+        # Escenario completo web: DELETE (desactiva) + POST (reactiva).
+        escuela = Escuela.objects.create(nombre='Test', cue='CUE-Y')
+        detail = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.delete(detail)
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        patrimonio = reverse('escuela-list-create')
+        res = self.client.post(patrimonio, {'nombre': 'Test', 'cue': 'CUE-Y'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        escuela.refresh_from_db()
+        self.assertTrue(escuela.activa)
+
+    def test_recrear_escuela_sin_cue_crea_nueva(self):
+        # Sin CUE no hay match de reactivación: se crea una escuela nueva.
+        Escuela.objects.create(nombre='Duplicada Nombre', activa=False)
+        url = reverse('escuela-list-create')
+        res = self.client.post(url, {'nombre': 'Duplicada Nombre'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Escuela.objects.filter(nombre='Duplicada Nombre').count(), 2)
+
+    def test_detalle_escuela_desactivada_da_404(self):
+        # Tras borrar (activa=False) el detalle no debe poder verse: evita
+        # que "atrás"/URL directa en la web la vuelvan a mostrar.
+        escuela = Escuela.objects.create(nombre='Test', activa=False)
+        url = reverse('escuela-detail', args=[escuela.id])
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
     # ── PUT con domicilio ────────────────────────────────
 
     def test_actualizar_escuela_put_crea_domicilio(self):
@@ -773,37 +813,37 @@ class EscuelaAPIPermissionTest(APITestCase):
         self.client.force_authenticate(user=user)
         return user
 
-    # ── Ayudante (verEscuelas, crearEscuela, editarEscuela, eliminarEscuela) ──
+    # ── Administrativo (verEscuelas, crearEscuela, editarEscuela, eliminarEscuela) ──
 
-    def test_ayudante_ver_escuelas(self):
-        self._auth('ayudante@prosane.test')
+    def test_administrativo_ver_escuelas(self):
+        self._auth('administrativo@prosane.test')
         Escuela.objects.create(nombre='Test')
         url = reverse('escuela-list-create')
         res = self.client.get(url)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
-    def test_ayudante_crear_escuela(self):
-        self._auth('ayudante@prosane.test')
+    def test_administrativo_crear_escuela(self):
+        self._auth('administrativo@prosane.test')
         url = reverse('escuela-list-create')
         res = self.client.post(url, {'nombre': 'Nueva'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
-    def test_ayudante_editar_escuela(self):
-        self._auth('ayudante@prosane.test')
+    def test_administrativo_editar_escuela(self):
+        self._auth('administrativo@prosane.test')
         escuela = Escuela.objects.create(nombre='Original')
         url = reverse('escuela-detail', args=[escuela.id])
         res = self.client.put(url, {'nombre': 'Editado'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
-    def test_ayudante_eliminar_escuela(self):
-        self._auth('ayudante@prosane.test')
+    def test_administrativo_eliminar_escuela(self):
+        self._auth('administrativo@prosane.test')
         escuela = Escuela.objects.create(nombre='Test')
         url = reverse('escuela-detail', args=[escuela.id])
         res = self.client.delete(url)
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
 
-    def test_ayudante_crear_curso(self):
-        self._auth('ayudante@prosane.test')
+    def test_administrativo_crear_curso(self):
+        self._auth('administrativo@prosane.test')
         escuela = Escuela.objects.create(nombre='Test')
         url = reverse('curso-list-create', args=[escuela.id])
         res = self.client.post(url, {'sala_grado_anio': '1°'}, format='json')
@@ -897,7 +937,7 @@ class EscuelaPerfilCompletitudTest(APITestCase):
         user.save(update_fields=["escuela"])
 
     def test_alta_minima_solo_nombre_y_perfil_incompleto(self):
-        self._auth('ayudante@prosane.test')
+        self._auth('administrativo@prosane.test')
         url = reverse('escuela-list-create')
         res = self.client.post(url, {'nombre': 'Nueva Mínima'}, format='json')
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
@@ -908,7 +948,7 @@ class EscuelaPerfilCompletitudTest(APITestCase):
         )
 
     def test_perfil_completo_con_todos_los_datos(self):
-        self._auth('ayudante@prosane.test')
+        self._auth('administrativo@prosane.test')
         url = reverse('escuela-list-create')
         res = self.client.post(url, {
             'nombre': 'Completa', 'cue': 'CUE1', 'sector_gestion': 'estatal',

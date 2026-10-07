@@ -11,10 +11,10 @@
   },
   {
     "model": "usuarios.rol",
-    "pk": "4e9d0fc2-d6b8-5c60-a421-bd7d1176f40f",
+    "pk": "0a0a929c-9068-513e-96bd-0845cea37834",
     "fields": {
-      "rol": "ayudante",
-      "ruta": "/home/ayudante",
+      "rol": "administrativo",
+      "ruta": "/home/administrativo",
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
     }

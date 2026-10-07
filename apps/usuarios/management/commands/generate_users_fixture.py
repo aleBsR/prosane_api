@@ -23,7 +23,7 @@ TEST_USERS = [
     ("superadmin@prosane.test", "c0000000-0000-0000-0000-000000000001", True, "superadmin"),
     ("medico@prosane.test", "c0000000-0000-0000-0000-000000000002", False, "medico"),
     ("odontologo@prosane.test", "c0000000-0000-0000-0000-000000000003", False, "odontologo"),
-    ("ayudante@prosane.test", "c0000000-0000-0000-0000-000000000004", False, "ayudante"),
+    ("administrativo@prosane.test", "c0000000-0000-0000-0000-000000000004", False, "administrativo"),
     ("tutor@prosane.test", "c0000000-0000-0000-0000-000000000005", False, "tutor"),
     ("medico1@prosane.test", "c0000000-0000-0000-0000-000000000006", False, "medico"),
     ("odontologo1@prosane.test", "c0000000-0000-0000-0000-000000000007", False, "odontologo"),

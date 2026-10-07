@@ -14,8 +14,8 @@ from apps.antecedentes.models import AntecedenteFamiliarTutor
 from apps.escuelas.models import Escuela
 from apps.tutores.models import Tutor
 from apps.usuarios.action_resolution import effective_actions
-from apps.usuarios.models import PasswordResetCode, Usuario
-from apps.usuarios.permissions import require_action
+from apps.usuarios.models import AuditoriaUsuario, PasswordResetCode, Usuario
+from apps.usuarios.permissions import EsAdmin, require_action
 from common.mails import TEMP_EXPIRY_HOURS, enviar_codigo_reset, enviar_temporal, generar_temporal
 from apps.personas.models import Persona
 from apps.usuarios.serializers import (
@@ -23,8 +23,9 @@ from apps.usuarios.serializers import (
     MePatchSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
-    UsuarioAyudanteSerializer,
+    UsuarioAdministrativoSerializer,
     UsuarioEscuelaSerializer,
+    UsuarioSuperadminSerializer,
 )
 
 
@@ -220,47 +221,47 @@ class UsuarioEscuelaResendTempView(APIView):
         return Response({'detail': 'Contraseña temporal reenviada.'})
 
 
-class UsuariosAyudantesListCreateView(APIView):
-    """GET/POST /usuarios/ayudantes/ — cuentas de ayudante (solo superadmin).
+class UsuariosAdministrativosListCreateView(APIView):
+    """GET/POST /usuarios/administrativos/ — cuentas de administrativo (solo superadmin).
 
-    El ayudante NO puede crear otros ayudantes: la acción `gestionarAyudantes`
+    El administrativo NO puede crear otros administrativos: la acción `gestionarAdministrativos`
     no está asignada a ningún rol; solo la resuelve el superuser.
     """
-    permission_classes = [require_action('gestionarAyudantes')]
+    permission_classes = [require_action('gestionarAdministrativos')]
 
     def get(self, request):
         usuarios = (
             Usuario.objects
-            .filter(roles__rol='ayudante')
+            .filter(roles__rol='administrativo')
             .distinct()
             .order_by('email')
         )
-        serializer = UsuarioAyudanteSerializer(usuarios, many=True)
+        serializer = UsuarioAdministrativoSerializer(usuarios, many=True)
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = UsuarioAyudanteSerializer(data=request.data)
+        serializer = UsuarioAdministrativoSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class UsuarioAyudanteDetailView(APIView):
-    """GET/PATCH/DELETE /usuarios/ayudantes/<pk>/ — detalle de una cuenta ayudante."""
-    permission_classes = [require_action('gestionarAyudantes')]
+class UsuarioAdministrativoDetailView(APIView):
+    """GET/PATCH/DELETE /usuarios/administrativos/<pk>/ — detalle de una cuenta administrativo."""
+    permission_classes = [require_action('gestionarAdministrativos')]
 
     def get_object(self, pk):
         return get_object_or_404(
-            Usuario.objects.filter(roles__rol='ayudante').distinct(), pk=pk,
+            Usuario.objects.filter(roles__rol='administrativo').distinct(), pk=pk,
         )
 
     def get(self, request, pk):
-        serializer = UsuarioAyudanteSerializer(self.get_object(pk))
+        serializer = UsuarioAdministrativoSerializer(self.get_object(pk))
         return Response(serializer.data)
 
     def patch(self, request, pk):
         usuario = self.get_object(pk)
-        serializer = UsuarioAyudanteSerializer(usuario, data=request.data, partial=True)
+        serializer = UsuarioAdministrativoSerializer(usuario, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
@@ -272,13 +273,13 @@ class UsuarioAyudanteDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class UsuarioAyudanteResendTempView(APIView):
-    """POST /usuarios/ayudantes/<pk>/resend-temp/ — reenvía temporal (72h)."""
-    permission_classes = [require_action('gestionarAyudantes')]
+class UsuarioAdministrativoResendTempView(APIView):
+    """POST /usuarios/administrativos/<pk>/resend-temp/ — reenvía temporal (72h)."""
+    permission_classes = [require_action('gestionarAdministrativos')]
 
     def post(self, request, pk):
         usuario = get_object_or_404(
-            Usuario.objects.filter(roles__rol='ayudante').distinct(), pk=pk,
+            Usuario.objects.filter(roles__rol='administrativo').distinct(), pk=pk,
         )
         temp = generar_temporal(usuario)
         usuario.set_password(temp)
@@ -344,3 +345,140 @@ class UsuarioEscuelaDetailView(APIView):
         usuario.is_active = False
         usuario.save(update_fields=['is_active'])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _ip_cliente(request):
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '') or ''
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+
+def _auditar_gestion_superadmin(actor, objetivo, accion, request):
+    AuditoriaUsuario.objects.create(
+        actor=actor if getattr(actor, 'is_authenticated', False) else None,
+        objetivo=objetivo,
+        accion=accion,
+        ip=_ip_cliente(request),
+    )
+
+
+def _es_ultimo_superadmin_activo(excluir_pk=None):
+    qs = (
+        Usuario.objects
+        .filter(roles__rol='superadmin', is_active=True)
+        .distinct()
+    )
+    if excluir_pk is not None:
+        qs = qs.exclude(pk=excluir_pk)
+    return not qs.exists()
+
+
+def _bloqueo_desactivacion(request, usuario):
+    """409 si intenta desactivarse a sí mismo o al último superadmin activo."""
+    if str(request.user.pk) == str(usuario.pk):
+        return Response(
+            {'detail': 'No podés desactivar tu propia cuenta de superadmin.'},
+            status=status.HTTP_409_CONFLICT,
+        )
+    if _es_ultimo_superadmin_activo(excluir_pk=usuario.pk):
+        return Response(
+            {'detail': 'No se puede desactivar: es el último superadmin activo.'},
+            status=status.HTTP_409_CONFLICT,
+        )
+    return None
+
+
+class UsuariosSuperadminListCreateView(APIView):
+    """GET/POST /usuarios/superadmins/ — cuentas de superadmin (solo superadmin).
+
+    El gate es `EsAdmin` (is_superuser): ningún rol por acciones puede crear
+    superadmins, ni siquiera el administrativo.
+    """
+    permission_classes = [EsAdmin]
+
+    def get(self, request):
+        usuarios = (
+            Usuario.objects
+            .filter(roles__rol='superadmin')
+            .distinct()
+            .order_by('email')
+        )
+        serializer = UsuarioSuperadminSerializer(usuarios, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = UsuarioSuperadminSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        usuario = serializer.save()
+        _auditar_gestion_superadmin(
+            request.user, usuario, AuditoriaUsuario.CREAR, request,
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class UsuarioSuperadminDetailView(APIView):
+    """GET/PATCH/DELETE /usuarios/superadmins/<pk>/ — detalle de un superadmin."""
+    permission_classes = [EsAdmin]
+
+    def get_object(self, pk):
+        return get_object_or_404(
+            Usuario.objects.filter(roles__rol='superadmin').distinct(), pk=pk,
+        )
+
+    def get(self, request, pk):
+        serializer = UsuarioSuperadminSerializer(self.get_object(pk))
+        return Response(serializer.data)
+
+    def patch(self, request, pk):
+        usuario = self.get_object(pk)
+        estaba_activo = usuario.is_active
+        serializer = UsuarioSuperadminSerializer(usuario, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        if estaba_activo and serializer.validated_data.get('is_active') is False:
+            bloqueo = _bloqueo_desactivacion(request, usuario)
+            if bloqueo is not None:
+                return bloqueo
+        serializer.save()
+        usuario.refresh_from_db()
+        if estaba_activo and not usuario.is_active:
+            _auditar_gestion_superadmin(
+                request.user, usuario, AuditoriaUsuario.DESACTIVAR, request,
+            )
+        elif not estaba_activo and usuario.is_active:
+            _auditar_gestion_superadmin(
+                request.user, usuario, AuditoriaUsuario.REACTIVAR, request,
+            )
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        usuario = self.get_object(pk)
+        bloqueo = _bloqueo_desactivacion(request, usuario)
+        if bloqueo is not None:
+            return bloqueo
+        usuario.is_active = False
+        usuario.save(update_fields=['is_active'])
+        _auditar_gestion_superadmin(
+            request.user, usuario, AuditoriaUsuario.DESACTIVAR, request,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UsuarioSuperadminResendTempView(APIView):
+    """POST /usuarios/superadmins/<pk>/resend-temp/ — reenvía temporal (72h)."""
+    permission_classes = [EsAdmin]
+
+    def post(self, request, pk):
+        usuario = get_object_or_404(
+            Usuario.objects.filter(roles__rol='superadmin').distinct(), pk=pk,
+        )
+        temp = generar_temporal(usuario)
+        usuario.set_password(temp)
+        usuario.must_change_password = True
+        usuario.temporal_password_expires_at = timezone.now() + timedelta(hours=TEMP_EXPIRY_HOURS)
+        usuario.save(update_fields=['password', 'must_change_password', 'temporal_password_expires_at'])
+        enviar_temporal(usuario.email, temp, es_reenvio=True)
+        _auditar_gestion_superadmin(
+            request.user, usuario, AuditoriaUsuario.RESEND_TEMP, request,
+        )
+        return Response({'detail': 'Contraseña temporal reenviada.'})

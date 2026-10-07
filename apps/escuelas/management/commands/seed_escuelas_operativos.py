@@ -118,7 +118,7 @@ class Command(BaseCommand):
         profesionales = {
             'medico': Usuario.objects.filter(email='medico@prosane.test').first(),
             'odontologo': Usuario.objects.filter(email='odontologo@prosane.test').first(),
-            'ayudante': Usuario.objects.filter(email='ayudante@prosane.test').first(),
+            'administrativo': Usuario.objects.filter(email='administrativo@prosane.test').first(),
         }
 
         for i, escuela in enumerate(escuelas):

@@ -10,6 +10,7 @@ urlpatterns = [
     path('<uuid:pk>/finalizar/', views.OperativoFinalizarView.as_view(), name='operativo-finalizar'),
     path('<uuid:pk>/cancelar/', views.OperativoCancelarView.as_view(), name='operativo-cancelar'),
     path('<uuid:pk>/completitud/', views.OperativoCompletitudView.as_view(), name='operativo-completitud'),
+    path('<uuid:pk>/derivaciones/', views.DerivacionesOperativoView.as_view(), name='operativo-derivaciones'),
     path('<uuid:pk>/profesionales/', views.OperativoProfesionalListView.as_view(), name='operativo-profesional-list'),
     path('<uuid:pk>/profesionales/asignar/', views.OperativoProfesionalAssignView.as_view(), name='operativo-profesional-assign'),
     path('<uuid:pk>/profesionales/<uuid:prof_pk>/remover/', views.OperativoProfesionalRemoveView.as_view(), name='operativo-profesional-remove'),
@@ -20,6 +21,7 @@ urlpatterns = [
     path('<uuid:pk>/alumnos/<uuid:alumno_pk>/evaluacion-odontologica/', views.EvaluacionOdontologicaView.as_view(), name='operativo-alumno-evaluacion-odontologica'),
     path('<uuid:pk>/alumnos/<uuid:alumno_pk>/seccion-escuela/', views.SeccionEscuelaView.as_view(), name='operativo-alumno-seccion-escuela'),
     path('<uuid:pk>/alumnos/<uuid:alumno_pk>/constancia/', views.ConstanciaAlumnoView.as_view(), name='operativo-alumno-constancia'),
+    path('<uuid:pk>/alumnos/<uuid:alumno_pk>/planilla/', views.PlanillaAlumnoView.as_view(), name='operativo-alumno-planilla'),
     path('<uuid:pk>/alumnos/<uuid:alumno_pk>/datos/', views.OperativoAlumnoDatosView.as_view(), name='operativo-alumno-datos'),
     path('<uuid:pk>/export/', views.ExportOperativoView.as_view(), name='operativo-export'),
 ]

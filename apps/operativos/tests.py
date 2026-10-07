@@ -25,11 +25,11 @@ from apps.operativos.serializers import EvaluacionOdontologicaSerializer
 _user_counter = 0
 
 
-def _create_ayudante(**kwargs):
+def _create_administrativo(**kwargs):
     global _user_counter
     _user_counter += 1
     return Usuario.objects.create_user(
-        email=kwargs.get('email', f'ayudante{_user_counter}@test.com'),
+        email=kwargs.get('email', f'administrativo{_user_counter}@test.com'),
         password='pass1234',
     )
 
@@ -138,7 +138,7 @@ class OperativoProfesionalModelTest(TestCase):
     def test_str(self):
         escuela = _create_escuela()
         op = _create_operativo(escuela)
-        user = _create_ayudante()
+        user = _create_administrativo()
         rel = OperativoProfesional.objects.create(
             operativo=op, profesional=user, rol_en_operativo='medico',
         )
@@ -260,6 +260,107 @@ class EvaluacionModelTest(TestCase):
                 EvaluacionMedica.objects.create(operativo_alumno=self.alumno)
 
 
+class CoercionDependientesTest(TestCase):
+    """Al cambiar un estado se limpian sus dependientes (sin checks huérfanos).
+
+    Los frontends ya limpian al alternar; el serializer coacciona como red
+    de seguridad para cualquier cliente.
+    """
+
+    def setUp(self):
+        from apps.operativos.serializers import (
+            EvaluacionMedicaSerializer, SeccionEscuelaSerializer,
+        )
+        self.EvaluacionMedicaSerializer = EvaluacionMedicaSerializer
+        self.SeccionEscuelaSerializer = SeccionEscuelaSerializer
+        self.escuela = _create_escuela()
+        self.operativo = _create_operativo(self.escuela)
+        self.alumno = OperativoAlumno.objects.create(
+            operativo=self.operativo,
+            apellido='Pérez', nombre='Ana', dni='30111222',
+        )
+
+    def test_medica_limpia_hallazgos_y_derivaciones(self):
+        s = self.EvaluacionMedicaSerializer(data={
+            'hallazgos': {
+                'piel': {'estado': 'sin', 'detalle': 'x', 'checks': ['escabiosis']},
+                'cardiovascular': {'estado': 'con', 'detalle': '', 'checks': ['soplo']},
+            },
+            'derivaciones': {
+                'odontologia': {'deriva': False, 'motivo': 'viejo'},
+                'nutricion': {'deriva': True, 'motivo': 'control'},
+            },
+        })
+        self.assertTrue(s.is_valid(), s.errors)
+        ev = s.save(operativo_alumno=self.alumno)
+        ev.refresh_from_db()
+        self.assertEqual(ev.hallazgos['piel']['checks'], [])
+        self.assertEqual(ev.hallazgos['piel']['detalle'], '')
+        self.assertEqual(ev.hallazgos['cardiovascular']['checks'], ['soplo'])
+        self.assertEqual(ev.derivaciones['odontologia']['motivo'], '')
+        self.assertEqual(ev.derivaciones['nutricion']['motivo'], 'control')
+
+    def test_medica_limpia_secciones_no_evaluadas(self):
+        s = self.EvaluacionMedicaSerializer(data={
+            'examen_realizado': True, 'motivo_no_examen': 'ausente', 'lugar_examen': 'escuela',
+            'trajo_carnet': False, 'carnet_completo': True,
+            'vacunas_aplicadas': 'x', 'vacunas_indicadas': 'y',
+            'antropometria_evaluada': False, 'peso': 50, 'percentil_talla': 'mayor_igual_3',
+            'presion_evaluada': False, 'pas': 110, 'presion_clasificacion': 'normal',
+            'agudeza_evaluada': False, 'ojo_derecho': '10/10', 'usa_lentes': True,
+            'audiometria_realizada': False, 'audiometria_resultado': 'pasa',
+        })
+        self.assertTrue(s.is_valid(), s.errors)
+        ev = s.save(operativo_alumno=self.alumno)
+        ev.refresh_from_db()
+        self.assertEqual(ev.motivo_no_examen, '')
+        self.assertEqual(ev.lugar_examen, 'escuela')
+        self.assertFalse(ev.carnet_completo)
+        self.assertEqual(ev.vacunas_aplicadas, '')
+        self.assertIsNone(ev.peso)
+        self.assertEqual(ev.percentil_talla, '')
+        self.assertIsNone(ev.pas)
+        self.assertEqual(ev.ojo_derecho, '')
+        self.assertFalse(ev.usa_lentes)
+        self.assertEqual(ev.audiometria_resultado, '')
+
+    def test_medica_patch_parcial_coacciona_con_instancia(self):
+        ev = EvaluacionMedica.objects.create(
+            operativo_alumno=self.alumno, presion_evaluada=True, pas=110, pad=70,
+        )
+        s = self.EvaluacionMedicaSerializer(
+            ev, data={'presion_evaluada': False}, partial=True,
+        )
+        self.assertTrue(s.is_valid(), s.errors)
+        s.save()
+        ev.refresh_from_db()
+        self.assertIsNone(ev.pas)
+        self.assertIsNone(ev.pad)
+
+    def test_odontologica_limpia_salud_bucal(self):
+        s = EvaluacionOdontologicaSerializer(data={
+            'salud_bucal': 'sin_hallazgos',
+            'lesiones_tejidos_blandos': True, 'caries': True, 'otros': 'viejo',
+        })
+        self.assertTrue(s.is_valid(), s.errors)
+        ev = s.save(operativo_alumno=self.alumno)
+        ev.refresh_from_db()
+        self.assertFalse(ev.lesiones_tejidos_blandos)
+        self.assertFalse(ev.caries)
+        self.assertEqual(ev.otros, '')
+
+    def test_seccion_escuela_limpia_detalle(self):
+        s = self.SeccionEscuelaSerializer(
+            self.alumno,
+            data={'escuela_preocupa_salud': False, 'escuela_preocupa_detalle': 'viejo'},
+            partial=True,
+        )
+        self.assertTrue(s.is_valid(), s.errors)
+        s.save()
+        self.alumno.refresh_from_db()
+        self.assertEqual(self.alumno.escuela_preocupa_detalle, '')
+
+
 class OperativoAlumnoEscuelaFieldsTest(TestCase):
     def test_campos_escuela_existen(self):
         campos = {f.name for f in OperativoAlumno._meta.get_fields()}
@@ -293,7 +394,7 @@ class OperativoAlumnoEscuelaFieldsTest(TestCase):
 class ServiciosTest(TestCase):
     def setUp(self):
         self.escuela = _create_escuela()
-        self.ayudante = _create_ayudante()
+        self.administrativo = _create_administrativo()
         self.medico = _create_medico()
         self.odontologo = _create_odontologo()
 
@@ -356,7 +457,7 @@ class ServiciosTest(TestCase):
     def test_asignar_profesional_sin_rol_profesional_da_error(self):
         op = _create_operativo(self.escuela)
         with self.assertRaises(ValueError):
-            services.asignar_profesional(op.id, self.ayudante.id)
+            services.asignar_profesional(op.id, self.administrativo.id)
 
     def test_asignar_profesional_solo_borrador(self):
         op = _create_operativo(self.escuela)
@@ -697,28 +798,28 @@ class OperativoAPITest(APITestCase):
         cls.escuela = _create_escuela()
 
     def setUp(self):
-        self.ayudante = _create_ayudante()
+        self.administrativo = _create_administrativo()
         self.medico = _create_medico()
         self.odontologo = _create_odontologo()
-        self.otro_ayudante = _create_ayudante()
+        self.otro_administrativo = _create_administrativo()
 
         # Assign roles
         from apps.usuarios.models import Rol
-        self.rol_ayudante = Rol.objects.get(rol='ayudante')
+        self.rol_administrativo = Rol.objects.get(rol='administrativo')
         self.rol_medico = Rol.objects.get(rol='medico')
         self.rol_odontologo = Rol.objects.get(rol='odontologo')
-        self.ayudante.roles.add(self.rol_ayudante)
+        self.administrativo.roles.add(self.rol_administrativo)
         self.medico.roles.add(self.rol_medico)
         self.odontologo.roles.add(self.rol_odontologo)
-        self.otro_ayudante.roles.add(self.rol_ayudante)
+        self.otro_administrativo.roles.add(self.rol_administrativo)
 
-        self.client.force_authenticate(user=self.ayudante)
+        self.client.force_authenticate(user=self.administrativo)
 
     def _create_operativo(self, **kwargs):
         defaults = {
             'escuela': self.escuela,
             'fecha': date(2026, 6, 20),
-            'created_by': self.ayudante,
+            'created_by': self.administrativo,
         }
         defaults.update(kwargs)
         return Operativo.objects.create(**defaults)
@@ -755,14 +856,14 @@ class OperativoAPITest(APITestCase):
         response = self.client.get(f'/api/v1/operativos/?estado={Operativo.BORRADOR}')
         self.assertEqual(response.status_code, 200)
 
-    def test_list_operativos_ayudante_solo_propios(self):
-        self._create_operativo(created_by=self.ayudante)
-        self._create_operativo(created_by=self.otro_ayudante)
+    def test_list_operativos_administrativo_solo_propios(self):
+        self._create_operativo(created_by=self.administrativo)
+        self._create_operativo(created_by=self.otro_administrativo)
         response = self.client.get('/api/v1/operativos/')
         self.assertEqual(len(response.data), 1)
 
     def test_list_operativos_medico_solo_asignados(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+        op = self._create_operativo(created_by=self.otro_administrativo)
         OperativoProfesional.objects.create(
             operativo=op, profesional=self.medico, rol_en_operativo='medico',
         )
@@ -941,6 +1042,21 @@ class OperativoAPITest(APITestCase):
         self.assertEqual(response.status_code, 201)
 
     def test_patch_alumno_estado(self):
+        # El administrativo solo lee alumnos: el cambio de estado le da 403.
+        op = self._create_operativo()
+        alumno = self._create_alumno(op)
+        response = self.client.patch(
+            f'/api/v1/operativos/{op.id}/alumnos/{alumno.id}/',
+            {'estado': OperativoAlumno.PRESENTE}, format='json',
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_patch_alumno_estado_superadmin(self):
+        from apps.usuarios.models import Usuario
+        admin = Usuario.objects.create_superuser(
+            email='admin-estado@test.com', password='test1234',
+        )
+        self.client.force_authenticate(user=admin)
         op = self._create_operativo()
         alumno = self._create_alumno(op)
         response = self.client.patch(
@@ -993,7 +1109,7 @@ class OperativoAPITest(APITestCase):
 
     # ─── Permisos por rol ───
     def test_medico_ve_asignados(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+        op = self._create_operativo(created_by=self.otro_administrativo)
         OperativoProfesional.objects.create(
             operativo=op, profesional=self.medico, rol_en_operativo='medico',
         )
@@ -1002,50 +1118,50 @@ class OperativoAPITest(APITestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_medico_no_ve_no_asignados(self):
-        self._create_operativo(created_by=self.otro_ayudante)
+        self._create_operativo(created_by=self.otro_administrativo)
         self.client.force_authenticate(user=self.medico)
         response = self.client.get('/api/v1/operativos/')
         self.assertEqual(len(response.data), 0)
 
     # ─── Aislamiento a nivel de objeto ───
-    def test_ayudante_no_ve_operativo_de_otro_ayudante(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+    def test_administrativo_no_ve_operativo_de_otro_administrativo(self):
+        op = self._create_operativo(created_by=self.otro_administrativo)
         response = self.client.get(f'/api/v1/operativos/{op.id}/')
         self.assertEqual(response.status_code, 404)
 
     def test_medico_no_ve_operativo_no_asignado(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+        op = self._create_operativo(created_by=self.otro_administrativo)
         self.client.force_authenticate(user=self.medico)
         response = self.client.get(f'/api/v1/operativos/{op.id}/')
         self.assertEqual(response.status_code, 404)
 
-    def test_ayudante_no_lista_alumnos_de_otro_ayudante(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+    def test_administrativo_no_lista_alumnos_de_otro_administrativo(self):
+        op = self._create_operativo(created_by=self.otro_administrativo)
         self._create_alumno(op)
         response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/')
         self.assertEqual(response.status_code, 404)
 
     def test_medico_no_lista_alumnos_de_no_asignado(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+        op = self._create_operativo(created_by=self.otro_administrativo)
         self._create_alumno(op)
         self.client.force_authenticate(user=self.medico)
         response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/')
         self.assertEqual(response.status_code, 404)
 
-    def test_ayudante_no_confirma_operativo_de_otro_ayudante(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+    def test_administrativo_no_confirma_operativo_de_otro_administrativo(self):
+        op = self._create_operativo(created_by=self.otro_administrativo)
         services.asignar_profesional(op.id, self.medico.id, 'medico')
         self._create_alumno(op)
         response = self.client.post(f'/api/v1/operativos/{op.id}/confirmar/')
         self.assertEqual(response.status_code, 404)
 
-    def test_ayudante_no_cancela_operativo_de_otro_ayudante(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+    def test_administrativo_no_cancela_operativo_de_otro_administrativo(self):
+        op = self._create_operativo(created_by=self.otro_administrativo)
         response = self.client.delete(f'/api/v1/operativos/{op.id}/')
         self.assertEqual(response.status_code, 404)
 
-    def test_ayudante_no_asigna_profesional_en_operativo_de_otro(self):
-        op = self._create_operativo(created_by=self.otro_ayudante)
+    def test_administrativo_no_asigna_profesional_en_operativo_de_otro(self):
+        op = self._create_operativo(created_by=self.otro_administrativo)
         data = {'profesional': str(self.medico.id), 'rol_en_operativo': 'medico'}
         response = self.client.post(
             f'/api/v1/operativos/{op.id}/profesionales/asignar/',
@@ -1053,8 +1169,8 @@ class OperativoAPITest(APITestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-    def test_ayudante_no_importa_csv_sin_permiso(self):
-        op = self._create_operativo(created_by=self.ayudante)
+    def test_administrativo_no_importa_csv_sin_permiso(self):
+        op = self._create_operativo(created_by=self.administrativo)
         csv_content = 'apellido,nombre,tipo_dni,dni,fecha_nacimiento,sexo\nGarcía,Juan,DNI,12345678,15/03/2015,M\n'
         csv_file = SimpleUploadedFile(
             'alumnos.csv', csv_content.encode('utf-8-sig'),
@@ -1112,3 +1228,634 @@ class OperativoAPITest(APITestCase):
         self.assertEqual(response.data['completos'], 1)
         self.assertEqual(response.data['pendientes'], 0)
         self.assertTrue(response.data['puede_finalizar'])
+
+
+class PlanillaPdfTest(TestCase):
+    """Planilla réplica del papel: genera PDF válido con datos mínimos y completos."""
+
+    def _finalizado_con_alumno(self, **alumno_kwargs):
+        escuela = _create_escuela()
+        op = _create_operativo(escuela)
+        op.estado = Operativo.FINALIZADO
+        op.save()
+        alumno = OperativoAlumno.objects.create(
+            operativo=op, apellido='Pérez', nombre='Juan', dni='50111222',
+            **alumno_kwargs,
+        )
+        return op, alumno
+
+    def test_genera_pdf_minimo(self):
+        from apps.operativos.services_planilla import generar_planilla_pdf
+        op, alumno = self._finalizado_con_alumno()
+        pdf = generar_planilla_pdf(op, alumno)
+        self.assertTrue(pdf.startswith(b'%PDF'))
+
+    def test_genera_pdf_completo(self):
+        from datetime import date
+        from apps.antecedentes.models import AntecedenteFamiliar, AntecedentePersonal
+        from apps.operativos.services_planilla import generar_planilla_pdf
+        op, alumno = self._finalizado_con_alumno(
+            fecha_nacimiento=date(2016, 3, 10), sexo='M',
+        )
+        persona = Persona.objects.create(
+            nombre='Juan', apellido='Pérez', dni='50111222',
+            tipo_dni='DNI', sexo='M', fecha_nacimiento=date(2016, 3, 10),
+        )
+        domicilio = Domicilio.objects.create(
+            calle='San Martín', nro_calle='123', localidad='Salta',
+            provincia='Salta',
+        )
+        from apps.pacientes.models import Paciente
+        paciente = Paciente.objects.create(
+            domicilio=domicilio, persona=persona, edad=10,
+            tiene_cud='NO', tipo_cobertura='Obra Social',
+            telefono_fijo='3874000000', consentimiento_aceptado=True,
+        )
+        alumno.paciente = paciente
+        alumno.escuela_preocupa_salud = True
+        alumno.escuela_preocupa_detalle = 'Corre muy rápido en el recreo'
+        alumno.escuela_dificultad_lenguaje = True
+        alumno.escuela_completado = True
+        alumno.antecedentes_completado = True
+        alumno.estado = OperativoAlumno.EVALUADO
+        alumno.observaciones = 'Sin observaciones.'
+        alumno.save()
+        AntecedentePersonal.objects.create(
+            paciente=paciente, nacio_prematuro='SI', peso_nacimiento='2,8',
+            asma_espasmos='SI', traumatismo_internacion='NO',
+            internacion_previa='SI', causa_hospitalizacion='Neumonía a los 4 años',
+            tratamiento_actual='SI', descripcion_tratamiento='Salbutamol',
+            ultima_consulta_medica='Hace menos de 1 año',
+            primera_menstruacion='NO',
+        )
+        AntecedenteFamiliar.objects.create(
+            paciente=paciente, problemas_salud='SI',
+            detalle_problema_salud='Asma del padre',
+            familiar_con_muerte_subita='NO',
+        )
+        EvaluacionMedica.objects.create(
+            operativo_alumno=alumno, completada=True,
+            examen_realizado=True, lugar_examen='escuela',
+            trajo_carnet=True, carnet_completo=False,
+            vacunas_indicadas='Refuerzo antitetánica',
+            antropometria_evaluada=True, peso=32.5, talla=135,
+            imc=17.8, percentil_talla='mayor_igual_3', percentil_imc='entre_10_84',
+            presion_evaluada=True, pas=95, pad=60,
+            agudeza_evaluada=True, ojo_derecho='10/10', ojo_izquierdo='9/10',
+            audiometria_realizada=True, audiometria_resultado='pasa',
+            hallazgos={
+                'piel': {'estado': 'con', 'detalle': '', 'checks': ['pediculosis']},
+                'cardiovascular': {'estado': 'sin', 'detalle': '', 'checks': []},
+            },
+            derivaciones={
+                'odontologia': {'deriva': True, 'motivo': 'Caries'},
+                'nutricion': {'deriva': False, 'motivo': ''},
+            },
+        )
+        EvaluacionOdontologica.objects.create(
+            operativo_alumno=alumno, completada=True,
+            salud_bucal='con_hallazgos', caries=True,
+            cpo_c=True, cpo_p=False, cpo_o=False,
+            ceo_c=False, ceo_e=False, ceo_o=True,
+            ensenanza_cepillado=True,
+            odontograma={
+                '16': {'estado_general': '', 'caras': {'oclusal': 'caries'}, 'raiz': '', 'notas': ''},
+                '11': {'estado_general': '', 'caras': {'oclusal': 'tratada'}, 'raiz': '', 'notas': ''},
+            },
+        )
+        pdf = generar_planilla_pdf(op, alumno)
+        self.assertTrue(pdf.startswith(b'%PDF'))
+        self.assertGreater(len(pdf), 10000)
+
+
+class PlanillaAlumnoAPITest(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command('seed_permissions', verbosity=0)
+        cls.escuela = _create_escuela()
+
+    def setUp(self):
+        from apps.usuarios.models import Rol
+        self.administrativo = _create_administrativo()
+        self.administrativo.roles.add(Rol.objects.get(rol='administrativo'))
+        self.client.force_authenticate(user=self.administrativo)
+
+    def _finalizado_con_alumno(self):
+        op = _create_operativo(self.escuela)
+        op.estado = Operativo.FINALIZADO
+        op.created_by = self.administrativo
+        op.save()
+        alumno = OperativoAlumno.objects.create(
+            operativo=op, apellido='García', nombre='Ana', dni='50222333',
+        )
+        return op, alumno
+
+    def test_planilla_pdf_200(self):
+        op, alumno = self._finalizado_con_alumno()
+        response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/{alumno.id}/planilla/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(response.content.startswith(b'%PDF'))
+
+    def test_planilla_requiere_finalizado(self):
+        op = _create_operativo(self.escuela)
+        op.created_by = self.administrativo
+        op.save()
+        alumno = OperativoAlumno.objects.create(
+            operativo=op, apellido='García', nombre='Ana', dni='50222333',
+        )
+        response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/{alumno.id}/planilla/')
+        self.assertEqual(response.status_code, 409)
+
+    def test_planilla_sin_permiso_403(self):
+        op, alumno = self._finalizado_con_alumno()
+        otro = _create_administrativo()
+        self.client.force_authenticate(user=otro)
+        response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/{alumno.id}/planilla/')
+        self.assertEqual(response.status_code, 403)
+
+
+class AuditoriaDocumentosTest(APITestCase):
+    """Cada acceso/impresión de documentos con datos sensibles se audita
+    (respalda la leyenda de protección de datos del footer)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('seed_permissions', verbosity=0)
+        cls.escuela = _create_escuela()
+
+    def setUp(self):
+        from apps.usuarios.models import Rol
+        self.administrativo = _create_administrativo()
+        self.administrativo.roles.add(Rol.objects.get(rol='administrativo'))
+        self.client.force_authenticate(user=self.administrativo)
+
+    def _finalizado_con_alumno(self):
+        op = _create_operativo(self.escuela)
+        op.estado = Operativo.FINALIZADO
+        op.created_by = self.administrativo
+        op.save()
+        alumno = OperativoAlumno.objects.create(
+            operativo=op, apellido='García', nombre='Ana', dni='50222333',
+        )
+        return op, alumno
+
+    def test_planilla_audita_acceso(self):
+        from apps.operativos.models import AuditoriaDocumento
+        op, alumno = self._finalizado_con_alumno()
+        response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/{alumno.id}/planilla/')
+        self.assertEqual(response.status_code, 200)
+        log = AuditoriaDocumento.objects.filter(
+            tipo=AuditoriaDocumento.PLANILLA, alumno=alumno,
+        ).first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.actor, self.administrativo)
+        self.assertEqual(log.operativo, op)
+        self.assertEqual(log.ip, '127.0.0.1')
+
+    def test_constancia_audita_acceso(self):
+        from apps.operativos.models import AuditoriaDocumento
+        op, alumno = self._finalizado_con_alumno()
+        response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/{alumno.id}/constancia/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            AuditoriaDocumento.objects.filter(
+                tipo=AuditoriaDocumento.CONSTANCIA, alumno=alumno,
+            ).exists()
+        )
+
+    def test_export_csv_audita_sin_alumno(self):
+        from apps.operativos.models import AuditoriaDocumento
+        op, _alumno = self._finalizado_con_alumno()
+        response = self.client.get(f'/api/v1/operativos/{op.id}/export/?formato=csv')
+        self.assertEqual(response.status_code, 200)
+        log = AuditoriaDocumento.objects.filter(
+            tipo=AuditoriaDocumento.EXPORT_CSV, operativo=op,
+        ).first()
+        self.assertIsNotNone(log)
+        self.assertIsNone(log.alumno)
+
+    def test_no_audita_si_no_finalizado(self):
+        from apps.operativos.models import AuditoriaDocumento
+        op = _create_operativo(self.escuela)
+        op.created_by = self.administrativo
+        op.save()
+        alumno = OperativoAlumno.objects.create(
+            operativo=op, apellido='García', nombre='Ana', dni='50222333',
+        )
+        response = self.client.get(f'/api/v1/operativos/{op.id}/alumnos/{alumno.id}/planilla/')
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(AuditoriaDocumento.objects.exists())
+
+
+class FooterProteccionDatosTest(APITestCase):
+    """La leyenda de protección de datos (Leyes 25.326 y 26.529) sale impresa."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('seed_permissions', verbosity=0)
+        cls.escuela = _create_escuela()
+
+    def _finalizado_con_alumno(self):
+        op = _create_operativo(self.escuela)
+        op.estado = Operativo.FINALIZADO
+        op.save()
+        alumno = OperativoAlumno.objects.create(
+            operativo=op, apellido='García', nombre='Ana', dni='50222333',
+        )
+        return op, alumno
+
+    @staticmethod
+    def _texto(pdf_bytes):
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        return "\n".join((p.extract_text() or "") for p in reader.pages)
+
+    def test_planilla_sin_footer_solo_datos(self):
+        from apps.operativos.services_planilla import generar_planilla_pdf
+        op, alumno = self._finalizado_con_alumno()
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(generar_planilla_pdf(op, alumno)))
+        paginas = [page.extract_text() or "" for page in reader.pages]
+        self.assertEqual(len(paginas), 2)
+        for texto in paginas:
+            self.assertNotIn('registrados y auditados', texto)
+
+    def test_constancia_trae_leyenda_completa(self):
+        from apps.operativos.services_constancia import generar_constancia_pdf
+        op, alumno = self._finalizado_con_alumno()
+        texto = self._texto(generar_constancia_pdf(op, alumno))
+        self.assertIn('dato personal sensible de salud', texto)
+        self.assertIn('26.529', texto)
+        self.assertIn('registrados y auditados', texto)
+
+
+class CompletarFlagTest(APITestCase):
+    """El flag `completar` del wizard controla completada sin romper legacy."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('seed_permissions', verbosity=0)
+        cls.escuela = _create_escuela()
+
+    def _en_curso_con_alumno(self):
+        from apps.operativos import services
+        op = _create_operativo(self.escuela)
+        medico = _create_medico()
+        services.asignar_profesional(op.id, medico.id, 'medico')
+        alumno = OperativoAlumno.objects.create(
+            operativo=op, apellido='A', nombre='B', dni='40111226')
+        services.confirmar_operativo(op.id)
+        services.iniciar_operativo(op.id)
+        self.client.force_authenticate(user=medico)
+        return op, alumno
+
+    def _url(self, op, alumno):
+        return f'/api/v1/operativos/{op.id}/alumnos/{alumno.id}/evaluacion-medica/'
+
+    def test_parcial_no_marca_completada(self):
+        op, alumno = self._en_curso_con_alumno()
+        res = self.client.put(self._url(op, alumno), {'peso': 30, 'completar': False},
+                              format='json')
+        self.assertEqual(res.status_code, 200)
+        alumno.refresh_from_db()
+        self.assertEqual(alumno.evaluacion_medica.peso, 30)
+        self.assertFalse(alumno.evaluacion_medica.completada)
+
+    def test_final_marca_completada(self):
+        op, alumno = self._en_curso_con_alumno()
+        res = self.client.put(self._url(op, alumno), {'peso': 30, 'completar': True},
+                              format='json')
+        self.assertEqual(res.status_code, 200)
+        alumno.refresh_from_db()
+        self.assertTrue(alumno.evaluacion_medica.completada)
+
+    def test_sin_flag_legacy_marca_completada(self):
+        op, alumno = self._en_curso_con_alumno()
+        res = self.client.put(self._url(op, alumno), {'peso': 30}, format='json')
+        self.assertEqual(res.status_code, 200)
+        alumno.refresh_from_db()
+        self.assertTrue(alumno.evaluacion_medica.completada)
+
+
+class CompletarFlagOdontoTest(APITestCase):
+    """El flag `completar` del wizard controla completada en odontológica."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('seed_permissions', verbosity=0)
+        cls.escuela = _create_escuela()
+
+    def _en_curso_con_alumno(self):
+        from apps.operativos import services
+        op = _create_operativo(self.escuela)
+        odontologo = _create_odontologo()
+        services.asignar_profesional(op.id, odontologo.id, 'odontologo')
+        alumno = OperativoAlumno.objects.create(
+            operativo=op, apellido='A', nombre='B', dni='40111227')
+        services.confirmar_operativo(op.id)
+        services.iniciar_operativo(op.id)
+        self.client.force_authenticate(user=odontologo)
+        return op, alumno
+
+    def _url(self, op, alumno):
+        return f'/api/v1/operativos/{op.id}/alumnos/{alumno.id}/evaluacion-odontologica/'
+
+    def test_parcial_no_marca_completada(self):
+        op, alumno = self._en_curso_con_alumno()
+        res = self.client.put(self._url(op, alumno),
+                              {'salud_bucal': 'sin_hallazgos', 'completar': False},
+                              format='json')
+        self.assertEqual(res.status_code, 200)
+        alumno.refresh_from_db()
+        self.assertEqual(alumno.evaluacion_odontologica.salud_bucal, 'sin_hallazgos')
+        self.assertFalse(alumno.evaluacion_odontologica.completada)
+
+    def test_final_marca_completada(self):
+        op, alumno = self._en_curso_con_alumno()
+        res = self.client.put(self._url(op, alumno),
+                              {'salud_bucal': 'sin_hallazgos', 'completar': True},
+                              format='json')
+        self.assertEqual(res.status_code, 200)
+        alumno.refresh_from_db()
+        self.assertTrue(alumno.evaluacion_odontologica.completada)
+
+
+class CompletarFlagDatosSeccionTest(APITestCase):
+    """El flag `completar` controla los completado de datos y sección E."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('seed_permissions', verbosity=0)
+        cls.escuela = _create_escuela()
+
+    def setUp(self):
+        from apps.usuarios.models import Usuario
+        self.superadmin = Usuario.objects.create_superuser(
+            email='rootflag@test.com', password='Clave1234')
+        self.client.force_authenticate(user=self.superadmin)
+        self.op = _create_operativo(self.escuela)
+        self.alumno = OperativoAlumno.objects.create(
+            operativo=self.op, apellido='A', nombre='B', dni='40111228')
+
+    def _url_datos(self):
+        return f'/api/v1/operativos/{self.op.id}/alumnos/{self.alumno.id}/datos/'
+
+    def _url_seccion(self):
+        return f'/api/v1/operativos/{self.op.id}/alumnos/{self.alumno.id}/seccion-escuela/'
+
+    def test_datos_parcial_no_marca_completado(self):
+        res = self.client.patch(self._url_datos(),
+                                {'apellido': 'A2', 'completar': False},
+                                format='json')
+        self.assertEqual(res.status_code, 200)
+        self.alumno.refresh_from_db()
+        self.assertEqual(self.alumno.apellido, 'A2')
+        self.assertFalse(self.alumno.antecedentes_completado)
+
+    def test_datos_final_marca_completado(self):
+        res = self.client.patch(self._url_datos(),
+                                {'apellido': 'A2', 'completar': True},
+                                format='json')
+        self.assertEqual(res.status_code, 200)
+        self.alumno.refresh_from_db()
+        self.assertTrue(self.alumno.antecedentes_completado)
+
+    def test_datos_sin_flag_legacy_marca_completado(self):
+        res = self.client.patch(self._url_datos(), {'apellido': 'A2'},
+                                format='json')
+        self.assertEqual(res.status_code, 200)
+        self.alumno.refresh_from_db()
+        self.assertTrue(self.alumno.antecedentes_completado)
+
+    def test_seccion_parcial_no_marca_completado(self):
+        res = self.client.patch(self._url_seccion(),
+                                {'escuela_preocupa_salud': True,
+                                 'completar': False},
+                                format='json')
+        self.assertEqual(res.status_code, 200)
+        self.alumno.refresh_from_db()
+        self.assertTrue(self.alumno.escuela_preocupa_salud)
+        self.assertFalse(self.alumno.escuela_completado)
+
+    def test_seccion_final_marca_completado(self):
+        res = self.client.patch(self._url_seccion(),
+                                {'escuela_preocupa_salud': False,
+                                 'completar': True},
+                                format='json')
+        self.assertEqual(res.status_code, 200)
+        self.alumno.refresh_from_db()
+        self.assertTrue(self.alumno.escuela_completado)
+
+
+# ──────────────────────────────────────────────
+#  Administrativo solo-lectura en alumnos
+# ──────────────────────────────────────────────
+class AdministrativoSoloLecturaTest(APITestCase):
+    """El administrativo lee todo (verOperativo) pero no modifica alumnos."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command('seed_permissions', verbosity=0)
+        cls.escuela = _create_escuela()
+
+    def setUp(self):
+        self.administrativo = _create_administrativo()
+        from apps.usuarios.models import Rol
+        self.administrativo.roles.add(Rol.objects.get(rol='administrativo'))
+        self.op = Operativo.objects.create(
+            escuela=self.escuela, fecha=date(2026, 6, 20),
+            created_by=self.administrativo,
+        )
+        self.alumno = OperativoAlumno.objects.create(
+            operativo=self.op, apellido='Lopez', nombre='Mario',
+            dni='40111225')
+        self.client.force_authenticate(user=self.administrativo)
+
+    def _url_seccion(self):
+        return f'/api/v1/operativos/{self.op.id}/alumnos/{self.alumno.id}/seccion-escuela/'
+
+    def _url_datos(self):
+        return f'/api/v1/operativos/{self.op.id}/alumnos/{self.alumno.id}/datos/'
+
+    def test_lee_alumnos_y_datos(self):
+        res = self.client.get(f'/api/v1/operativos/{self.op.id}/alumnos/')
+        self.assertEqual(res.status_code, 200)
+        res = self.client.get(
+            f'/api/v1/operativos/{self.op.id}/alumnos/{self.alumno.id}/')
+        self.assertEqual(res.status_code, 200)
+        res = self.client.get(self._url_datos())
+        self.assertEqual(res.status_code, 200)
+
+    def test_lee_pero_no_escribe_seccion_escuela(self):
+        res = self.client.get(self._url_seccion())
+        self.assertEqual(res.status_code, 200)
+        res = self.client.patch(
+            self._url_seccion(), {'escuela_preocupa_salud': True},
+            format='json')
+        self.assertEqual(res.status_code, 403)
+
+    def test_no_cambia_estado_ni_datos(self):
+        res = self.client.patch(
+            f'/api/v1/operativos/{self.op.id}/alumnos/{self.alumno.id}/',
+            {'estado': OperativoAlumno.PRESENTE}, format='json')
+        self.assertEqual(res.status_code, 403)
+        res = self.client.patch(
+            self._url_datos(), {'apellido': 'X'}, format='json')
+        self.assertEqual(res.status_code, 403)
+
+
+# ──────────────────────────────────────────────
+#  Derivaciones por operativo (Anexo I 4.6)
+# ──────────────────────────────────────────────
+class DerivacionesOperativoTest(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command('seed_permissions', verbosity=0)
+        cls.escuela = _create_escuela()
+
+    def setUp(self):
+        self.administrativo = _create_administrativo()
+        self.medico = _create_medico()
+        self.otro_medico = _create_medico()
+        from apps.usuarios.models import Rol
+        self.administrativo.roles.add(Rol.objects.get(rol='administrativo'))
+        self.medico.roles.add(Rol.objects.get(rol='medico'))
+        self.otro_medico.roles.add(Rol.objects.get(rol='medico'))
+        self.op = Operativo.objects.create(
+            escuela=self.escuela, fecha=date(2026, 6, 20),
+            created_by=self.administrativo,
+        )
+        self.alumno = OperativoAlumno.objects.create(
+            operativo=self.op, apellido='Perez', nombre='Ana', dni='40111223')
+        OperativoProfesional.objects.create(
+            operativo=self.op, profesional=self.medico, rol_en_operativo='medico')
+        EvaluacionMedica.objects.update_or_create(
+            operativo_alumno=self.alumno,
+            defaults={
+                'profesional': self.medico,
+                'derivaciones': {
+                    'oftalmologia': {'deriva': True, 'motivo': 'Disminucion agudeza'},
+                    'odontologia': {'deriva': False, 'motivo': ''},
+                    'pediatria': {'deriva': True, 'motivo': 'Control'},
+                },
+            },
+        )
+        self.url = f'/api/v1/operativos/{self.op.id}/derivaciones/'
+
+    def test_lista_como_administrativo(self):
+        self.client.force_authenticate(user=self.administrativo)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['total'], 2)
+        esps = {d['especialidad'] for d in res.data['derivaciones']}
+        self.assertEqual(esps, {'oftalmologia', 'pediatria'})
+        item = [d for d in res.data['derivaciones'] if d['especialidad'] == 'oftalmologia'][0]
+        self.assertEqual(item['motivo'], 'Disminucion agudeza')
+        self.assertEqual(item['dni'], '40111223')
+        self.assertEqual(res.data['por_especialidad'], {'oftalmologia': 1, 'pediatria': 1})
+
+    def test_filtro_especialidad(self):
+        self.client.force_authenticate(user=self.administrativo)
+        res = self.client.get(self.url, {'especialidad': 'pediatria'})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['total'], 1)
+
+    def test_especialidad_invalida_400(self):
+        self.client.force_authenticate(user=self.administrativo)
+        res = self.client.get(self.url, {'especialidad': 'traumatologia'})
+        self.assertEqual(res.status_code, 400)
+
+    def test_medico_asignado_ve(self):
+        self.client.force_authenticate(user=self.medico)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['total'], 2)
+
+    def test_medico_no_asignado_404(self):
+        self.client.force_authenticate(user=self.otro_medico)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 404)
+
+    def test_sin_derivaciones_total_cero(self):
+        EvaluacionMedica.objects.filter(operativo_alumno=self.alumno).update(
+            derivaciones={'odontologia': {'deriva': False, 'motivo': ''}})
+        self.client.force_authenticate(user=self.administrativo)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['total'], 0)
+
+
+# ──────────────────────────────────────────────
+#  Familia + consentimiento en /datos/ (Anexo I, solo lectura + auditoría)
+# ──────────────────────────────────────────────
+class DatosFamiliaConsentimientoTest(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command('seed_permissions', verbosity=0)
+        cls.escuela = _create_escuela()
+
+    def setUp(self):
+        from apps.antecedentes.models import AntecedenteFamiliar
+        from apps.auditoria.models import AuditoriaCambio
+        from apps.pacientes.models import Paciente
+        from apps.tutores.models import Tutor
+        self.AntecedenteFamiliar = AntecedenteFamiliar
+        self.AuditoriaCambio = AuditoriaCambio
+        self.medico = _create_medico()
+        self.escuela_user = _create_administrativo(email='escuela_fam@test.com')
+        from apps.usuarios.models import Rol
+        self.medico.roles.add(Rol.objects.get(rol='medico'))
+        self.escuela_user.roles.add(Rol.objects.get(rol='escuela'))
+        self.escuela_user.escuela = self.escuela
+        self.escuela_user.save(update_fields=['escuela'])
+        self.op = Operativo.objects.create(
+            escuela=self.escuela, fecha=date(2026, 6, 20),
+        )
+        OperativoProfesional.objects.create(
+            operativo=self.op, profesional=self.medico, rol_en_operativo='medico')
+        persona_nino = Persona.objects.create(
+            nombre='Ana', apellido='Perez', dni='40111224', tipo_dni='DNI',
+            sexo='femenino', fecha_nacimiento=date(2018, 3, 4))
+        dom = Domicilio.objects.create(localidad='Salta')
+        persona_tutor = Persona.objects.create(
+            nombre='Maria', apellido='Perez', dni='30111224', tipo_dni='DNI',
+            sexo='femenino', fecha_nacimiento=date(1990, 5, 6))
+        tutor = Tutor.objects.create(persona=persona_tutor, parentesco='madre')
+        self.paciente = Paciente.objects.create(
+            persona=persona_nino, domicilio=dom, tutor=tutor,
+            escuela=self.escuela, edad=8,
+            consentimiento_aceptado=True)
+        AntecedenteFamiliar.objects.create(
+            paciente=self.paciente, problemas_salud='SI',
+            detalle_problema_salud='Diabetes', familiar_con_muerte_subita='NO')
+        self.alumno = OperativoAlumno.objects.create(
+            operativo=self.op, paciente=self.paciente,
+            apellido='Perez', nombre='Ana', dni='40111224')
+        self.url = f'/api/v1/operativos/{self.op.id}/alumnos/{self.alumno.id}/datos/'
+
+    def test_medico_ve_familia_y_consentimiento_y_audita(self):
+        self.client.force_authenticate(user=self.medico)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['antecedente_familiar']['problemas_salud'], 'SI')
+        self.assertTrue(res.data['consentimiento']['aceptado'])
+        self.assertEqual(res.data['tutor']['parentesco'], 'madre')
+        self.assertEqual(res.data['tutor']['dni'], '30111224')
+        aud = self.AuditoriaCambio.objects.filter(
+            entidad='alumno_datos', accion='leer', entidad_id=self.alumno.id)
+        self.assertEqual(aud.count(), 1)
+        self.assertEqual(aud.first().actor_id, self.medico.id)
+
+    def test_escuela_ve_pero_no_audita_lectura(self):
+        self.client.force_authenticate(user=self.escuela_user)
+        res = self.client.get(self.url)
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNotNone(res.data['antecedente_familiar'])
+        self.assertFalse(self.AuditoriaCambio.objects.filter(
+            entidad='alumno_datos', accion='leer').exists())
+
+    def test_medico_patch_sigue_403(self):
+        self.client.force_authenticate(user=self.medico)
+        res = self.client.patch(self.url, {'apellido': 'X'}, format='json')
+        self.assertEqual(res.status_code, 403)

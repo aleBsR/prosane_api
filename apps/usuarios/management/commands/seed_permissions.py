@@ -25,14 +25,17 @@ ROLE_ACTIONS = {
         "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
         "cargarAntecedentesNino",
         "verGestionUsuarios",
-        "gestionarUsuariosEscuela", "gestionarAyudantes", "gestionarProfesionales",
+        "gestionarUsuariosEscuela", "gestionarAdministrativos", "gestionarProfesionales",
+        "verAuditoria",
     ],
-    "ayudante": [
+    "administrativo": [
         "verEscuelas", "crearEscuela", "editarEscuela", "eliminarEscuela",
         "verOperativo", "crearOperativo", "editarOperativo",
         "confirmarOperativo", "iniciarOperativo", "finalizarOperativo", "cancelarOperativo",
         "gestionarProfesionalesEnOperativo",
-        "gestionarEstadoAlumnoEnOperativo", "cargarSeccionEscuela",
+        # Sin gestionarEstadoAlumnoEnOperativo ni cargarSeccionEscuela:
+        # el administrativo lee todo (verOperativo) pero no modifica
+        # ningún dato de alumnos.
         "verGestionUsuarios", "gestionarUsuariosEscuela", "gestionarProfesionales",
     ],
     "medico": [

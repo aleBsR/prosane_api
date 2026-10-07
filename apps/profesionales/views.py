@@ -13,7 +13,14 @@ from apps.profesionales.serializers import (
 from apps.profesionales.services.services_refeps import RefepsError, RefepsService
 from apps.usuarios.models import Usuario
 from apps.usuarios.permissions import require_action
+from apps.auditoria.helpers import auditar_cambio
+from apps.auditoria.models import AuditoriaCambio
 from common.mails import TEMP_EXPIRY_HOURS, enviar_temporal, generar_temporal
+
+
+def _detalle_profesional(usuario):
+    roles = list(usuario.roles.values_list('rol', flat=True))
+    return {'email': usuario.email, 'roles': roles}
 
 
 class ValidarMatriculaView(APIView):
@@ -80,7 +87,9 @@ class ProfesionalesListCreateView(APIView):
     def post(self, request):
         serializer = ProfesionalCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        usuario = serializer.save()
+        auditar_cambio(request, 'profesional_cuenta', AuditoriaCambio.CREAR,
+                       entidad_id=usuario.id, detalle=_detalle_profesional(usuario))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -110,12 +119,19 @@ class ProfesionalDetailView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        auditar_cambio(request, 'profesional_cuenta', AuditoriaCambio.EDITAR,
+                       entidad_id=usuario.id,
+                       detalle={**_detalle_profesional(usuario),
+                                'campos': sorted(request.data.keys())})
         return Response(serializer.data)
 
     def delete(self, request, pk):
         usuario = self.get_object(pk)
+        detalle = _detalle_profesional(usuario)
         usuario.is_active = False
         usuario.save(update_fields=["is_active"])
+        auditar_cambio(request, 'profesional_cuenta', AuditoriaCambio.DESACTIVAR,
+                       entidad_id=usuario.id, detalle=detalle)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

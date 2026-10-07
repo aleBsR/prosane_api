@@ -56,7 +56,9 @@ INSTALLED_APPS = [
     'apps.profesionales',
     'apps.escuelas',
     'apps.operativos',
+    'apps.integraciones',
     'apps.docs',
+    'apps.auditoria',
 ]
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
@@ -211,8 +213,26 @@ SIMPLE_JWT = {
 }
 
 # MVP: validación de matrículas contra datos mockeados
-# Cambiar a False cuando se integre con REFEPS real
+# Cambiar a False cuando haya credenciales SAFESA (ver SAFESA_* abajo)
 REFEPS_MOCK = True
+
+# Integraciones nacionales directas (camino B): Federador MSAL (RENAPER) y
+# Bus Nacional MSAL (REFEPS/FHIR). Sin estas credenciales, REFEPS_MOCK=True
+# y validar-dni responde 503 con mensaje claro. NUNCA commitear valores
+# reales: las provee el administrador de RENAPER/SISA-MSAL.
+FEDERADOR_BASE_URL = os.getenv(
+    'FEDERADOR_BASE_URL',
+    'https://federador.msal.gob.ar/masterfile-federacion-service/api')
+FEDERADOR_DOMINIO = os.getenv('FEDERADOR_DOMINIO', 'DOMINIOSINAUTORIZACIONDEALTA')
+FEDERADOR_USUARIO = os.getenv('FEDERADOR_USUARIO', '')
+FEDERADOR_CLAVE = os.getenv('FEDERADOR_CLAVE', '')
+BUS_BASE_URL = os.getenv('BUS_BASE_URL', 'https://bus.msal.gob.ar')
+BUS_ISSUER = os.getenv('BUS_ISSUER', '')
+BUS_SECRET = os.getenv('BUS_SECRET', '')
+BUS_SCOPE = os.getenv('BUS_SCOPE', 'Practitioner/*.read')
+BUS_NAME = os.getenv('BUS_NAME', '')
+BUS_IDENT = os.getenv('BUS_IDENT', '')
+BUS_ROLE = os.getenv('BUS_ROLE', '')
 
 
 # Email (reset de contraseña y avisos).
